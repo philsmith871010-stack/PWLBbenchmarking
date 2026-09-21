@@ -106,19 +106,22 @@
     // an exact name on the master list first, then a known alias, then anything that looks alike
     D.cp.rows.forEach(function(r){var s=Math.max(similarity(name,r.short),similarity(name,r.name));if(s>=0.4)out.push({id:r.id,label:r.short+' · '+r.name,score:s>=0.99?1:Math.min(s,0.9),kind:'bank'})});
     for(var a in ALIAS){if(n===a||n.indexOf(a+' ')===0||(' '+n+' ').indexOf(' '+a+' ')>=0){var r=D.cp.byId[ALIAS[a]];if(r&&!out.some(function(o){return o.id===r.id&&o.score>=1})){out=out.filter(function(o){return o.id!==r.id});out.push({id:r.id,label:r.short+' · '+r.name,score:0.95,kind:'bank'})}}}
-    if(k==='la'||!out.length){var ln=laNorm(name);D.peers.authorities.forEach(function(a){var an=laNorm(a.name);var s=an&&ln===an?1:Math.max(similarity(name,a.name),an&&ln.indexOf(an)===0?0.85:0);if(s>=0.5)out.push({id:'la:'+a.code,label:a.name+' (local authority)',score:s,kind:'la'})})}
+    // a name that is an authority's is read as the intra-LA class and nothing more specific: the
+    // deal is between two public bodies and neither of them is named on a benchmark
+    var isLA=k==='la';
+    if(!k&&!out.length){var ln=laNorm(name);isLA=D.peers.authorities.some(function(a){var an=laNorm(a.name);return an&&(ln===an||ln.indexOf(an+' ')===0)})}
     out.sort(function(x,y){return y.score-x.score});
     out=out.slice(0,6);
-    if(k&&k!=='la')out.unshift({id:'class:'+k,label:CLASS_LABEL[k],score:0.99,kind:k});
-    else if(k==='la'&&!out.some(function(o){return o.kind==='la'}))out.unshift({id:'class:la',label:'Another local authority',score:0.9,kind:'la'});
+    if(isLA)out.unshift({id:'class:la',label:CLASS_LABEL.la,score:0.99,kind:'la'});
+    else if(k)out.unshift({id:'class:'+k,label:CLASS_LABEL[k],score:0.99,kind:k});
     return out;
   }
   // A class that is not a bank still has a standing: the DMADF is HM Treasury, gilts are the
   // sovereign, another authority is a statutory body that cannot default in the ordinary way,
   // and a sterling MMF is triple-A rated by construction. Pooled funds carry market risk, not
   // credit risk, and are not scored.
-  var CLASS_SCORE={dmadf:{score:95,band:'A',rating:'AA-',label:'DMADF (HM Treasury)'},gov:{score:95,band:'A',rating:'AA-',label:'Gilts and Treasury bills'},la:{score:90,band:'A',rating:'\u2014',label:'Local authority'},mmf:{score:88,band:'A',rating:'AAA',label:'Money market fund'}};
-  var CLASS_LABEL={mmf:'Money market fund',dmadf:'DMADF (Debt Management Office)',funds:'Pooled or property fund',gov:'Gilts and Treasury bills',la:'Another local authority',lender:'Lender to you, not a deposit counterparty',other:'Other, not on the master list'};
+  var CLASS_SCORE={dmadf:{score:95,band:'A',rating:'AA-',label:'DMADF (HM Treasury)'},gov:{score:95,band:'A',rating:'AA-',label:'Gilts and Treasury bills'},la:{score:90,band:'A',rating:'\u2014',label:'Intra-LA'},mmf:{score:88,band:'A',rating:'AAA',label:'Money market fund'}};
+  var CLASS_LABEL={mmf:'Money market fund',dmadf:'DMADF (Debt Management Office)',funds:'Pooled or property fund',gov:'Gilts and Treasury bills',la:'Intra-LA deposit or loan (not named)',lender:'Lender to you, not a deposit counterparty',other:'Other, not on the master list'};
   function memory(){try{return JSON.parse(localStorage.getItem('pwlb.bench.matches')||'{}')}catch(e){return{}}}
   function remember(m){try{localStorage.setItem('pwlb.bench.matches',JSON.stringify(m))}catch(e){}}
 
@@ -178,12 +181,13 @@
     // one exposure per counterparty: a bank by its master-list entry, whatever it was called in the
     // paste; a fund or an authority by its own name, since two money market funds are two names
     var byName={},matchOf={};inv.forEach(function(r){var m=S.matches[r.name]||'',k=m&&m.indexOf('class:')<0?m:r.name;byName[k]=(byName[k]||0)+r.amount/1e6;matchOf[k]=m});
+    var laN=0;
     var exp=Object.keys(byName).map(function(k){return {id:k,match:matchOf[k],v:byName[k]}}).sort(function(a,b){return b.v-a.v});
     var largest=exp.length&&total?exp[0].v/total*100:null,top3=total?exp.slice(0,3).reduce(function(a,x){return a+x.v},0)/total*100:null;
     var scored=[],unscored=0,bands={};
     exp.forEach(function(x){var e=D.cp.byId[x.id];
       if(!e){var m=x.match||'',k=m.indexOf('class:')===0?m.slice(6):(m.indexOf('la:')===0?'la':null),cs=k&&CLASS_SCORE[k];
-        if(cs){var la=k==='la'&&m.indexOf('la:')===0?D.peers.authorities.filter(function(a){return 'la:'+a.code===m})[0]:null;e={short:la?la.name:x.id,kind:cs.label,score:cs.score,band:cs.band,rating_composite:cs.rating,fixed:true}}}
+        if(cs){e={short:k==='la'?'Intra-LA deposit '+(++laN):x.id,kind:cs.label,score:cs.score,band:cs.band,rating_composite:cs.rating,fixed:true}}}
       if(e&&e.score!=null){scored.push({e:e,v:x.v});bands[e.band]=(bands[e.band]||0)+x.v}else unscored+=x.v});
     var sw=scored.reduce(function(a,x){return a+x.v},0),wscore=sw?scored.reduce(function(a,x){return a+x.v*x.e.score},0)/sw:null;
     return {inv:inv,bor:bor,total:total,by:by,ret:ret,days:wd,ladder:ladder,exp:exp,largest:largest,top3:top3,n:exp.length,scored:scored,unscored:unscored,bands:bands,wscore:wscore};
@@ -241,7 +245,10 @@
   function peerSet(){return D.peers.authorities.filter(function(a){return a.class===S.group&&(!S.auth||a.code!==S.auth.code)})}
   function peerAlloc(){
     var ps=peerSet().filter(function(a){return a.inv&&a.inv.total>0}),out={};
-    ['banks','bs','mmf','dmadf','gov','la','funds','other'].forEach(function(k){out[k]=stats(ps.map(function(a){return a.inv[k]/a.inv.total*100}))});
+    // the marker is the group's pooled share, the band the middle half of authorities: a median
+    // borough holds no bank deposits at all, which is true and says nothing about the group
+    var gt=ps.reduce(function(s,a){return s+a.inv.total},0);
+    ['banks','bs','mmf','dmadf','gov','la','funds','other'].forEach(function(k){var st=stats(ps.map(function(a){return a.inv[k]/a.inv.total*100}));if(st)st.med=gt?ps.reduce(function(s,a){return s+a.inv[k]},0)/gt*100:0;out[k]=st});
     out.total=stats(ps.map(function(a){return a.inv.total}));out.n=ps.length;return out;
   }
   function peerBorrow(){
@@ -298,6 +305,22 @@
       if(i%2===0)out+='<text class="ax" x="'+(x+ww/2).toFixed(1)+'" y="'+(h-10)+'" text-anchor="middle">'+r.fy+'</text>'});
     return out+'</svg><div class="legend"><span><i style="background:#0a2540"></i>PWLB</span><span><i style="background:#7d93ad"></i>other borrowing you pasted</span><span class="muted">principal falling due in each financial year, April to March; instalment loans by the instalments they pay</span></div>';
   }
+  function bubbles(inv){
+    var pts=inv.map(function(r){var d=tenorDays(r),k=classify(r),m=S.matches[r.name]||'',e=D.cp.byId[m],cs=CLASS_SCORE[k];var sc=e&&e.score!=null?e.score:(cs?cs.score:null);
+      return {r:r,d:d==null?1:Math.max(1,d),rate:r.rate,sc:sc,k:k,label:k==='la'?'Intra-LA deposit':(e?e.short:(cs?cs.label:r.name))}}).filter(function(p){return p.rate!=null});
+    if(!pts.length)return '<div class="empty">No rated investments to draw.</div>';
+    var w=1300,h=360,L=70,R=30,T=20,B=44;
+    var lo=Math.min.apply(null,pts.map(function(p){return p.rate}))-0.15,hi=Math.max.apply(null,pts.map(function(p){return p.rate}))+0.15;
+    var maxD=Math.max(400,Math.max.apply(null,pts.map(function(p){return p.d}))),maxA=Math.max.apply(null,pts.map(function(p){return p.r.amount}));
+    var X=function(d){return L+Math.log10(d)/Math.log10(maxD)*(w-L-R)},Y=function(v){return T+(hi-v)/(hi-lo)*(h-T-B)};
+    var col=function(sc){return sc==null?'#b8c2ce':sc>=85?'#1e7a3a':sc>=75?'#4f7a1f':sc>=65?'#b35900':'#b04632'};
+    var out='<svg class="chart" viewBox="0 0 '+w+' '+h+'">';
+    [1,7,31,92,183,365].filter(function(d){return d<=maxD}).forEach(function(d){out+='<line x1="'+X(d).toFixed(1)+'" x2="'+X(d).toFixed(1)+'" y1="'+T+'" y2="'+(h-B)+'" stroke="#eef1f4"/><text class="ax" x="'+X(d).toFixed(1)+'" y="'+(h-16)+'" text-anchor="middle">'+(d===1?'call':d===7?'1w':d===31?'1m':d===92?'3m':d===183?'6m':'1y')+'</text>'});
+    var step=(hi-lo)>1?0.5:0.25;for(var v=Math.ceil(lo/step)*step;v<=hi;v+=step)out+='<line x1="'+L+'" x2="'+(w-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="#eef1f4"/><text class="ax" x="'+(L-8)+'" y="'+(Y(v)+4).toFixed(1)+'" text-anchor="end">'+v.toFixed(2)+'%</text>';
+    pts.sort(function(a,b){return b.r.amount-a.r.amount}).forEach(function(p){var rr=6+Math.sqrt(p.r.amount/maxA)*26;
+      out+='<circle cx="'+X(p.d).toFixed(1)+'" cy="'+Y(p.rate).toFixed(1)+'" r="'+rr.toFixed(1)+'" fill="'+col(p.sc)+'" fill-opacity=".55" stroke="'+col(p.sc)+'" stroke-width="1.5"><title>'+esc(p.label)+': '+fmtM(p.r.amount/1e6)+' at '+p.rate.toFixed(2)+'%, '+(p.d<=1?'call':p.d+' days')+(p.sc!=null?', standing '+p.sc.toFixed(0):', not scored')+'</title></circle>'});
+    return out+'</svg><div class="legend"><span>size: amount</span><span>across: time to run, log scale</span><span>up: rate</span><span><i style="background:#1e7a3a"></i>85 and over</span><span><i style="background:#4f7a1f"></i>75 to 84</span><span><i style="background:#b35900"></i>65 to 74</span><span><i style="background:#b04632"></i>under 65</span><span><i style="background:#b8c2ce"></i>not scored</span></div>';
+  }
   function bandMix(bands,total){var keys=['A','B','C','D','E'],out='',x=0;keys.forEach(function(b){var v=bands[b]||0;if(!v)return;var wpc=v/total*100;out+='<span class="band band-'+b+'" style="display:inline-flex;width:'+wpc.toFixed(1)+'%;border-radius:0;height:16px;font-size:10px" title="band '+b+': '+fmtM(v)+'">'+b+'</span>';x+=wpc});return '<div style="display:flex;width:100%;border-radius:5px;overflow:hidden;background:#f1f3f5;margin:6px 0">'+out+'</div>'}
 
   function render(){
@@ -310,7 +333,8 @@
     var mixT=Object.keys(B.mix).map(function(m){return m.charAt(0)+m.slice(1).toLowerCase()+' '+fmtM(B.mix[m]/1e6)}).join(' \u00b7 ');
     var curve=curveOf('MATURITY'),pred=D.pred;
     $('panels-inv').innerHTML=
-      panel('Investment allocation','real','Share of investments by counterparty class, against the quarterly returns of your peer group ('+PA.n+' filed).',
+      panel('Your investments: size, rate, time and standing','real','Every investment you pasted, one bubble each. Point at one for its figures. Other authorities appear as intra-LA deposits, never by name.',bubbles(Y.inv),true)+
+      panel('Investment allocation','real','Share of investments by counterparty class. The mark is the peer group\u2019s pooled share from the quarterly returns ('+PA.n+' filed), the band the middle half of authorities.',
         '<div class="kpis">'+kpi(fmtM(Y.total),'invested',PA.total?'peer median '+fmtM(PA.total.med):'')+kpi(Y.n,'counterparties')+'</div>'+alloc)+
       panel('Return and duration','ill','Weighted average rate and days to maturity of what you hold; pooled funds excluded from duration.',
         '<div class="kpis">'+kpi(pct(Y.ret,2),'weighted return',vs(Y.ret,PI.ret,'%',2))+kpi(Y.days==null?'\u2014':Math.round(Y.days)+' days','weighted duration',vs(Y.days,PI.days,' days',0))+'</div>'+
@@ -348,7 +372,7 @@
     poolNote();
   }
   function showTab(k){document.querySelectorAll('.tab').forEach(function(b){b.classList.toggle('active',b.dataset.tab===k)});document.querySelectorAll('.tabpanel').forEach(function(p){p.classList.toggle('active',p.id==='tab-'+k)})}
-  function poolNote(){var n=0;try{n=(JSON.parse(localStorage.getItem('pwlb.bench.pool')||'[]')).length}catch(e){}$('pool-note').textContent=n?n+' contribution'+(n>1?'s':'')+' held on this device · the live version posts an anonymised summary to the shared pool':'Adds an anonymised summary of your figures to the peer pool. Prototype: held on this device only.'}
+  function poolNote(){var n=0;try{n=(JSON.parse(localStorage.getItem('pwlb.bench.pool')||'[]')).length}catch(e){}$('pool-note').textContent=n?n+' contribution'+(n>1?'s':'')+' held on this device · the live version posts an anonymised summary to the shared pool':'Adds an anonymised summary of your figures to the peer pool: totals, shares and averages, never a deal or a counterparty name. Prototype: held on this device only.'}
 
   // ---- steps
   function pickAuth(a){

@@ -62,7 +62,8 @@ def test_the_example_reads_matches_and_benchmarks(page):
     assert read["NatWest"].startswith("NatWest Bank")
     assert read["Aberdeen Sterling Liquidity Fund"] == "Money market fund"
     assert read["DMADF"].startswith("DMADF")
-    assert read["Thurrock Council"] == "Thurrock (local authority)"
+    assert read["Thurrock Council"].startswith("Intra-LA deposit or loan"), "another authority is a class, never a name"
+    assert read["Greater Manchester Combined Authority"].startswith("Intra-LA")
     assert read["Phoenix Life"].startswith("Lender")
     assert page.eval_on_selector_all("#match-table tr.bad", "e => e.length") == 2, "only the two lenders need a look"
     page.click("#confirm")
@@ -72,13 +73,15 @@ def test_the_example_reads_matches_and_benchmarks(page):
     assert page.eval_on_selector(".tab.active", "e => e.dataset.tab") == "investments"
     assert page.eval_on_selector_all(".tab[disabled]", "e => e.length") == 0
     titles = page.eval_on_selector_all(".panel h3", "e => e.map(x => x.firstChild.textContent)")
-    assert titles == ["Investment allocation", "Return and duration", "Maturity ladder", "Concentration",
+    assert titles == ["Your investments: size, rate, time and standing", "Investment allocation", "Return and duration", "Maturity ladder", "Concentration",
                       "Credit risk on the Counterparty scale", "Borrowing", "Maturity profile", "Debt maturing by financial year", "Outstanding balance, projected",
                       "Refinancing in the next twelve months", "New borrowing raised", "New investments placed"]
     tags = page.eval_on_selector_all(".panel .tag", "e => e.map(x => x.textContent)")
-    assert tags.count("published") == 7 and tags.count("illustrative") == 5, "every panel says which it is"
+    assert tags.count("published") == 8 and tags.count("illustrative") == 5, "every panel says which it is"
     inv = page.eval_on_selector("#panels-inv", "e => e.textContent")
     assert "83.5m" in inv and "DMADF (HM Treasury), fixed standing" in inv and "Money market fund, fixed standing" in inv, "the classes carry a fixed high standing"
+    assert "Intra-LA deposit 1" in inv and "Thurrock" not in inv and "Woking" not in inv, "no other authority is named in the results"
+    assert page.eval_on_selector_all("#panels-inv svg.chart circle", "e => e.length") == 22, "one bubble per rated investment"
     bor = page.eval_on_selector("#panels-bor", "e => e.textContent")
     assert "PWLB outstanding" in bor and "5y 5.85%" in bor and "10y 6.20%" in bor, "today's PWLB maturity curve read at the right tenors"
     assert "including the bespoke structures you set" in bor, "the example carries an interest-only annuity"
