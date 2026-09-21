@@ -1,0 +1,4 @@
+data/feeds/la-allocations-live.json
+data/feeds/bc-loans.json
+__pycache__/
+.browser-test-root/

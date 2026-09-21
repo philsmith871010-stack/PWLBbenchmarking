@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PWLB benchmarking</title>
+<meta name="description" content="Peer benchmarking for local authority treasury portfolios: paste from Excel, match to the Counterparty master list, compare against every authority's published balances and the PWLB loan book.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%23fd7e14'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/bench.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./"><i></i>PWLB <em>today</em></a>
+  <span class="crumb"><b>Benchmarking</b> / treasury peer comparison</span>
+  <span class="top-right"><span class="sponsor">In association with <span>sponsor logo</span></span><span class="beta">PROTOTYPE</span></span>
+</header>
+<main>
+  <section class="card" id="s1">
+    <h2><span class="step" id="st1">1</span>Your authority</h2>
+    <p class="lede">Your PWLB loans are already here, loan by loan, from the published book. Choosing the authority also sets the peer group, which you can change.</p>
+    <div class="row">
+      <span class="sugg"><input id="auth-q" type="search" placeholder="Start typing an authority" autocomplete="off"><div class="sugg-list" id="auth-sugg" hidden></div></span>
+      <label class="small muted">Peer group <select id="group"></select></label>
+      <span class="small muted" id="auth-note"></span>
+    </div>
+    <div class="auth-pick" id="auth-pick" hidden></div>
+  </section>
+
+  <section class="card" id="s2">
+    <h2><span class="step" id="st2">2</span>Paste your portfolio</h2>
+    <p class="lede">Copy the range straight from Excel and paste it here: investments and any non-PWLB borrowing, one row each. Columns are read from their contents, so the order and the headings do not matter. Most rows need only counterparty, amount, rate, type, start and end; loans add a repayment profile.</p>
+    <textarea id="paste" placeholder="Counterparty	Amount	Rate	Type	Start	End	Profile&#10;Barclays Bank UK PLC	5,000,000	4.35%	Fixed deposit	15/06/2026	15/12/2026" spellcheck="false"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="filter blue" id="read">Read it</button>
+      <button class="filter" id="demo">Paste the example portfolio</button>
+      <span class="small muted" id="read-note">Nothing leaves this browser until you choose to contribute it.</span>
+    </div>
+  </section>
+
+  <section class="card" id="s3" hidden>
+    <h2><span class="step" id="st3">3</span>Check the names</h2>
+    <p class="lede" id="match-lede"></p>
+    <div class="table-wrap"><table class="plain" id="match-table"></table></div>
+    <div class="row" style="margin-top:12px"><button class="filter blue" id="confirm">Confirm and benchmark</button><span class="small muted">Confirmed matches are remembered on this device, so next month is one paste.</span></div>
+  </section>
+
+  <section id="s4" hidden>
+    <div class="card" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <h2 style="margin:0"><span class="step" id="st4">4</span>Against your peers</h2>
+      <span class="small muted" id="bench-note"></span>
+      <span class="pool" style="margin-left:auto"><button class="filter blue" id="pool">Contribute to the pool</button><span class="small muted" id="pool-note"></span></span>
+    </div>
+    <div class="panels" id="panels"></div>
+    <div class="legend" style="margin-top:12px"><span><i class="i-you"></i>you</span><span><i class="i-med"></i>peer median</span><span><i class="i-rng"></i>peer middle half</span><span><span class="tag tag-real">published</span> from the quarterly returns and the PWLB loan book</span><span><span class="tag tag-ill">illustrative</span> invented until the pool has enough contributors</span></div>
+  </section>
+
+  <p class="foot" id="foot">Prototype. Balances from the Local authority borrowing and investment returns (every authority, quarterly) and the PWLB loan book, both via pwlbtoday.org; counterparty standing from the Counterparty site's published method. Nothing here is advice. <span id="src-note"></span></p>
+</main>
+<script src="assets/bench.js"></script>
+</body>
+</html>
