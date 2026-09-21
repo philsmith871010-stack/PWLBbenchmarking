@@ -28,33 +28,56 @@
     <div class="auth-pick" id="auth-pick" hidden></div>
   </section>
 
-  <section class="card" id="s2">
-    <h2><span class="step" id="st2">2</span>Paste your portfolio</h2>
-    <p class="lede">Copy the range straight from Excel and paste it here: investments and any non-PWLB borrowing, one row each. Columns are read from their contents, so the order and the headings do not matter. Most rows need only counterparty, amount, rate, type, start and end; loans add a repayment profile.</p>
-    <textarea id="paste" placeholder="Counterparty	Amount	Rate	Type	Start	End	Profile&#10;Barclays Bank UK PLC	5,000,000	4.35%	Fixed deposit	15/06/2026	15/12/2026" spellcheck="false"></textarea>
-    <div class="row" style="margin-top:10px">
-      <button class="filter blue" id="read">Read it</button>
-      <button class="filter" id="demo">Paste the example portfolio</button>
-      <span class="small muted" id="read-note">Nothing leaves this browser until you choose to contribute it.</span>
-    </div>
-  </section>
-
-  <section class="card" id="s3" hidden>
-    <h2><span class="step" id="st3">3</span>Check the names</h2>
-    <p class="lede" id="match-lede"></p>
-    <div class="table-wrap"><table class="plain" id="match-table"></table></div>
-    <div class="row" style="margin-top:12px"><button class="filter blue" id="confirm">Confirm and benchmark</button><span class="small muted">Confirmed matches are remembered on this device, so next month is one paste.</span></div>
-  </section>
-
   <section id="s4" hidden>
-    <div class="card" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+    <div class="card" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
       <h2 style="margin:0"><span class="step" id="st4">4</span>Against your peers</h2>
       <span class="small muted" id="bench-note"></span>
       <span class="pool" style="margin-left:auto"><button class="filter blue" id="pool">Contribute to the pool</button><span class="small muted" id="pool-note"></span></span>
     </div>
-    <div class="panels" id="panels"></div>
-    <div class="legend" style="margin-top:12px"><span><i class="i-you"></i>you</span><span><i class="i-med"></i>peer median</span><span><i class="i-rng"></i>peer middle half</span><span><span class="tag tag-real">published</span> from the quarterly returns and the PWLB loan book</span><span><span class="tag tag-ill">illustrative</span> invented until the pool has enough contributors</span></div>
   </section>
+
+  <div class="card tabs-card">
+    <div class="tabs" id="tabs" role="tablist">
+      <button class="tab active" data-tab="positions">Positions</button>
+      <button class="tab" data-tab="investments" disabled>Investments</button>
+      <button class="tab" data-tab="borrowing" disabled>Borrowing</button>
+      <button class="tab" data-tab="activity" disabled>Activity</button>
+    </div>
+
+    <section class="tabpanel active" id="tab-positions">
+      <div id="s2">
+        <h2><span class="step" id="st2">2</span>Paste your portfolio</h2>
+        <p class="lede">Copy the range straight from Excel and paste it here: investments and any non-PWLB borrowing, one row each. Columns are read from their contents, so the order and the headings do not matter. Most rows need only counterparty, amount, rate, type, start and end; loans add a repayment profile, and a bespoke structure can be set after the paste.</p>
+        <textarea id="paste" placeholder="Counterparty	Amount	Rate	Type	Start	End	Profile&#10;Barclays Bank UK PLC	5,000,000	4.35%	Fixed deposit	15/06/2026	15/12/2026" spellcheck="false"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="filter blue" id="read">Read it</button>
+          <button class="filter" id="demo">Paste the example portfolio</button>
+          <span class="small muted" id="read-note">Nothing leaves this browser until you choose to contribute it.</span>
+        </div>
+      </div>
+      <div id="s3" hidden style="margin-top:22px">
+        <h2><span class="step" id="st3">3</span>Check the names</h2>
+        <p class="lede" id="match-lede"></p>
+        <div class="table-wrap scrollbox match-box"><table class="plain" id="match-table"></table></div>
+        <div class="row" style="margin-top:12px"><button class="filter blue" id="confirm">Confirm and benchmark</button><span class="small muted">Confirmed matches and bespoke structures are remembered on this device, so next month is one paste.</span></div>
+      </div>
+    </section>
+    <section class="tabpanel" id="tab-investments"><div class="panels" id="panels-inv"></div></section>
+    <section class="tabpanel" id="tab-borrowing"><div class="panels" id="panels-bor"></div></section>
+    <section class="tabpanel" id="tab-activity"><div class="panels" id="panels-act"></div></section>
+    <div class="legend tab-legend"><span><i class="i-you"></i>you</span><span><i class="i-med"></i>peer median</span><span><i class="i-rng"></i>peer middle half</span><span><span class="tag tag-real">published</span> from the quarterly returns and the PWLB loan book</span><span><span class="tag tag-ill">illustrative</span> invented until the pool has enough contributors</span></div>
+  </div>
+
+  <dialog id="deal-dlg">
+    <h2 style="margin:0 0 4px;font-size:16px;color:var(--navy)">Bespoke structure</h2>
+    <p class="lede" id="deal-name"></p>
+    <div class="deal-grid">
+      <label>Repayment<select id="deal-method"><option value="MATURITY">Maturity (bullet)</option><option value="EIP">Equal instalments of principal</option><option value="ANNUITY">Annuity</option></select></label>
+      <label>Interest only until<input id="deal-io" type="date"><span class="small muted">leave blank if repayments start at once</span></label>
+      <label>Payments<select id="deal-freq"><option value="6">Half-yearly</option><option value="12">Annual</option><option value="3">Quarterly</option></select></label>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="filter blue" id="deal-save">Save</button><button class="filter" id="deal-close">Cancel</button></div>
+  </dialog>
 
   <p class="foot" id="foot">Prototype. Balances from the Local authority borrowing and investment returns (every authority, quarterly) and the PWLB loan book, both via pwlbtoday.org; counterparty standing from the Counterparty site's published method. Nothing here is advice. <span id="src-note"></span></p>
 </main>

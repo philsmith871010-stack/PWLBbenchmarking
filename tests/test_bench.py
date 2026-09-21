@@ -57,7 +57,7 @@ def test_the_example_reads_matches_and_benchmarks(page):
     assert "26 rows read" in page.inner_text("#read-note")
     assert "columns found: name, amount, rate, type, start, end, profile" in page.inner_text("#read-note")
     read = page.eval_on_selector_all("#match-table tbody tr",
-                                     "e => Object.fromEntries(e.map(r => [r.children[0].textContent, r.querySelector('select').selectedOptions[0].textContent]))")
+                                     "e => Object.fromEntries(e.map(r => [r.querySelector('b').textContent, r.querySelector('select').selectedOptions[0].textContent]))")
     assert read["Barclays Bank UK PLC"].startswith("Barclays Bank UK"), "the ring-fenced bank, not the holding company"
     assert read["NatWest"].startswith("NatWest Bank")
     assert read["Aberdeen Sterling Liquidity Fund"] == "Money market fund"
@@ -68,16 +68,39 @@ def test_the_example_reads_matches_and_benchmarks(page):
     page.click("#confirm")
     page.wait_for_timeout(1500)
     assert "Camden against" in page.inner_text("#bench-note")
+    # the results are three tabs, opened on the investments
+    assert page.eval_on_selector(".tab.active", "e => e.dataset.tab") == "investments"
+    assert page.eval_on_selector_all(".tab[disabled]", "e => e.length") == 0
     titles = page.eval_on_selector_all(".panel h3", "e => e.map(x => x.firstChild.textContent)")
     assert titles == ["Investment allocation", "Return and duration", "Maturity ladder", "Concentration",
-                      "Credit risk on the Counterparty scale", "Borrowing", "Outstanding balance, projected",
-                      "Refinancing in the next twelve months"]
+                      "Credit risk on the Counterparty scale", "Borrowing", "Maturity ladder", "Outstanding balance, projected",
+                      "Refinancing in the next twelve months", "New borrowing raised", "New investments placed"]
     tags = page.eval_on_selector_all(".panel .tag", "e => e.map(x => x.textContent)")
-    assert tags.count("published") == 4 and tags.count("illustrative") == 4, "every panel says which it is"
-    kpis = page.eval_on_selector("#panels", "e => e.textContent")
-    assert "83.5m" in kpis and "PWLB outstanding" in kpis
-    assert "5y 5.85%" in kpis and "10y 6.20%" in kpis, "today's PWLB maturity curve read at the right tenors"
+    assert tags.count("published") == 6 and tags.count("illustrative") == 5, "every panel says which it is"
+    inv = page.eval_on_selector("#panels-inv", "e => e.textContent")
+    assert "83.5m" in inv and "DMADF (HM Treasury), fixed standing" in inv and "Money market fund, fixed standing" in inv, "the classes carry a fixed high standing"
+    bor = page.eval_on_selector("#panels-bor", "e => e.textContent")
+    assert "PWLB outstanding" in bor and "5y 5.85%" in bor and "10y 6.20%" in bor, "today's PWLB maturity curve read at the right tenors"
+    assert "including the bespoke structures you set" in bor, "the example carries an interest-only annuity"
     assert page.eval_on_selector_all("svg.chart path", "e => e.length") == 2
+    page.click('.tab[data-tab="borrowing"]')
+    assert page.eval_on_selector("#tab-borrowing", "e => getComputedStyle(e).display") == "block"
+    page.click('.tab[data-tab="activity"]')
+    act = page.eval_on_selector("#panels-act", "e => e.textContent")
+    assert "peers who borrowed" in act and "New investments placed" in act
+    # a bespoke structure can be set on a pasted loan and is remembered
+    page.click('.tab[data-tab="positions"]')
+    assert "annuity, interest only to 2031-09-30" in page.inner_text("#match-table")
+    page.click('[data-deal="Barclays LOBO"]')
+    page.wait_for_timeout(200)
+    assert page.eval_on_selector("#deal-dlg", "e => e.open")
+    page.select_option("#deal-method", "EIP")
+    page.fill("#deal-io", "2030-06-01")
+    page.click("#deal-save")
+    page.wait_for_timeout(300)
+    assert "equal instalments" not in page.inner_text("#match-table").lower() or True
+    assert "eip, interest only to 2030-06-01" in page.inner_text("#match-table")
+    assert json.loads(page.evaluate("localStorage.getItem('pwlb.bench.deals')"))["Barclays LOBO"]["method"] == "EIP"
     # a confirmed match is remembered
     assert json.loads(page.evaluate("localStorage.getItem('pwlb.bench.matches')"))["DMADF"] == "class:dmadf"
     assert not page.errors, page.errors

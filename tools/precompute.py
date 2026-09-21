@@ -140,11 +140,40 @@ def main(fixtures: bool) -> None:
         method = "MATURITY" if method == "FIXED" else method
         loans[code].append([method, r[bh["Start"]], r[bh["Maturity"]], round(num(r[bh["Principal"]])), num(r[bh["Rate"]])])
 
+    # new PWLB loans, the last two years, under the same names: what the peers actually raised
+    act = feed("pwlb-activity", fixtures)
+    ah = {h: i for i, h in enumerate(act[0])}
+    activity: dict[str, list] = defaultdict(list)
+    def dmy_words(s):
+        try:
+            return datetime.strptime(s.strip(), "%d %b %Y").date().isoformat()
+        except ValueError:
+            return None
+    cutoff = date.today().replace(year=date.today().year - 2).isoformat()
+    for r in act[1:]:
+        when = dmy_words(r[ah["Settlement Date"]])
+        if not when or when < cutoff:
+            continue
+        who = r[ah["Counterparty Name"]]
+        if who not in matched_names:
+            n = norm(who); hit = by_norm.get(n)
+            if not hit:
+                cands = sorted(((len(k.split()), c) for k, cs in by_norm.items() if k and set(k.split()) <= set(n.split()) for c in cs), reverse=True)
+                hit = [cands[0][1]] if cands and (len(cands) == 1 or cands[0][0] > cands[1][0]) else None
+            matched_names[who] = hit[0] if hit else None
+        code = matched_names[who]
+        if not code:
+            continue
+        kind = r[ah["Loan Type and Repayment Method"]].upper()
+        method = "ANNUITY" if "ANNUITY" in kind else "EIP" if "EIP" in kind else "MATURITY"
+        mat = dmy_words(r[ah["Maturity Date"]])
+        activity[code].append([when, mat, method, round(num(r[ah["Amount Advanced (£)"]])), num(r[ah["Interest Rate (%)"]])])
+
     out = {"generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
            "quarter": iso(qi), "quarter_borrowing": iso(qb),
            "authorities": sorted(auth.values(), key=lambda a: a["name"])}
     (ROOT / "data" / "peers.json").write_text(json.dumps(out, separators=(",", ":")))
-    (ROOT / "data" / "pwlb-loans.json").write_text(json.dumps({"generated": out["generated"], "loans": loans}, separators=(",", ":")))
+    (ROOT / "data" / "pwlb-loans.json").write_text(json.dumps({"generated": out["generated"], "loans": loans, "activity": activity, "activity_from": cutoff}, separators=(",", ":")))
     big = sorted(unmatched.items(), key=lambda x: -x[1])[:8]
     print(f"{len(auth)} authorities, quarter {out['quarter']}; loans matched for {len(loans)} of them, "
           f"{sum(len(v) for v in loans.values())} loans; {len(unmatched)} borrowers unmatched, largest: "

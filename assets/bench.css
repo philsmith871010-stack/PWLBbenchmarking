@@ -78,3 +78,19 @@ svg.chart{width:100%;height:auto;display:block}
 dialog{border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:0 24px 60px rgba(10,37,64,.28);max-width:min(900px,calc(100vw - 32px))}
 dialog::backdrop{background:rgba(10,37,64,.32);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 @media (max-width:760px){main{padding:14px 12px 40px}.panels{grid-template-columns:1fr}.bars{grid-template-columns:110px minmax(0,1fr) 54px 54px}input[type=search]{min-width:0;width:100%}header.top{padding:0 14px}.crumb{display:none}}
+
+/* the results in tabs, the positions in a window of their own */
+.tabs-card{padding:0 0 12px}
+.tabs{display:flex;gap:0;padding:0 18px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{padding:12px 4px;margin-right:22px;font:inherit;font-size:14px;font-weight:500;color:var(--muted);background:none;border:0;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
+.tab.active{color:var(--navy);border-bottom-color:var(--orange);font-weight:600}
+.tab[disabled]{opacity:.45;cursor:default}
+.tabpanel{display:none;padding:16px 18px 4px}.tabpanel.active{display:block}
+.tab-legend{padding:8px 18px 0}
+textarea#paste{height:220px;min-height:120px;resize:vertical}
+.match-box{max-height:56vh}
+.deal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.deal-grid label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.deal-grid input,.deal-grid select{font-size:14px}
+.tailor{height:26px;padding:0 9px;font-size:12px}
+.deal-tag{display:inline-block;margin-left:6px;font-size:11px;color:var(--amber)}
