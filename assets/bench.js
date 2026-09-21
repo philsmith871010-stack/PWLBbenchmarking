@@ -280,7 +280,7 @@
   function bars(rows){return '<div class="bars"><div class="h"></div><div class="h"></div><div class="h num">you</div><div class="h num">median</div>'+rows.join('')+'</div>'}
   function kpi(v,l,sub,cls){return '<div class="kpi"><b>'+v+'</b><span>'+l+'</span>'+(sub?'<i'+(cls?' class="'+cls+'"':'')+'>'+sub+'</i>':'')+'</div>'}
   function vs(you,st,unit,dp,lowGood){if(you==null||!st)return '';var d=you-st.med;var good=lowGood?d<0:d>0;return (d>=0?'+':'−')+Math.abs(d).toFixed(dp)+unit+' vs median'+(Math.abs(d)<1e-9?'':'')}
-  function panel(title,tag,sub,body,wide){return '<section class="panel'+(wide?' wide':'')+'"><h3>'+title+'<span class="tag '+(tag==='real'?'tag-real':'tag-ill')+'">'+(tag==='real'?'published':'illustrative')+'</span></h3><p class="sub">'+sub+'</p>'+body+'</section>'}
+  function panel(title,tag,sub,body,wide){return '<section class="panel'+(wide===2?' two':wide?' wide':'')+'"><h3>'+title+'<span class="tag '+(tag==='real'?'tag-real':'tag-ill')+'">'+(tag==='real'?'published':'illustrative')+'</span></h3><p class="sub">'+sub+'</p>'+body+'</section>'}
   function projection(proj){
     var w=1300,h=300,L=70,R=16,T=16,B=30,n=proj.length;
     var max=Math.max.apply(null,proj.map(function(p){return p.pwlb+p.other}))||1;
@@ -344,7 +344,7 @@
         bars([bar('Largest',Y.largest,PI.largest,'%',0),bar('Top three',Y.top3,PI.top3,'%',0)]))+
       panel('Credit risk on the Counterparty scale','ill','Weighted score of what you hold, on the published method. The DMADF, gilts, other authorities and money market funds carry a fixed standing; pooled funds carry market risk and are not scored.',
         '<div class="kpis">'+kpi(Y.wscore==null?'\u2014':Y.wscore.toFixed(1),'weighted score',vs(Y.wscore,PI.score,'',1))+kpi(pct(Y.total?Y.unscored/Y.total*100:null,0),'not scored')+'</div>'+bandMix(Y.bands,Y.total)+
-        (credit?'<div class="table-wrap scrollbox" style="max-height:300px"><table class="plain"><thead><tr><th>Name</th><th class="num">Held</th><th class="num">Score</th><th>Agency rating</th></tr></thead><tbody>'+credit+'</tbody></table></div>':'<div class="empty">No name on the master list in this portfolio.</div>'),true);
+        (credit?'<div class="table-wrap scrollbox" style="max-height:300px"><table class="plain"><thead><tr><th>Name</th><th class="num">Held</th><th class="num">Score</th><th>Agency rating</th></tr></thead><tbody>'+credit+'</tbody></table></div>':'<div class="empty">No name on the master list in this portfolio.</div>'),2);
     $('panels-bor').innerHTML=
       panel('Borrowing','real','Your PWLB book from the published loans'+(S.auth?' for '+esc(S.auth.name):'')+', plus any borrowing you pasted; peers on the same book.',
         '<div class="kpis">'+kpi(fmtM(B.pwlb),'PWLB outstanding',B.n+' loans')+kpi(pct(B.rate,2),'PWLB weighted rate',vs(B.rate,PB.rate,'%',2,true))+kpi(B.life==null?'\u2014':B.life.toFixed(1)+' yrs','weighted life',vs(B.life,PB.life,' yrs',1))+kpi(fmtM(B.total),'all borrowing')+'</div>'+
