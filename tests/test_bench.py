@@ -85,6 +85,8 @@ def test_the_example_reads_matches_and_benchmarks(page):
     assert page.eval_on_selector_all("svg.chart path", "e => e.length") == 2
     fy = page.eval_on_selector_all("#panels-bor table tbody tr", "e => e.map(r => r.children[0].textContent + ' ' + r.children[3].textContent)")
     assert fy[0].startswith("26/27") and any(x.startswith("41/42") for x in fy), fy[:3]
+    rate = page.eval_on_selector("#panels-bor table tbody tr td:nth-child(5)", "e => e.textContent")
+    assert rate == "4.80%", "the rate on what matures in the current year is the 10m at 4.80%"
     assert "Liquid: call, MMF, DMADF" in inv and "Under 1 month" in inv and "1 to 3 months" in inv
     page.click('.tab[data-tab="borrowing"]')
     assert page.eval_on_selector("#tab-borrowing", "e => getComputedStyle(e).display") == "block"
@@ -93,16 +95,16 @@ def test_the_example_reads_matches_and_benchmarks(page):
     assert "peers who borrowed" in act and "New investments placed" in act
     # a bespoke structure can be set on a pasted loan and is remembered
     page.click('.tab[data-tab="positions"]')
-    assert "annuity, interest only to 2031-09-30" in page.inner_text("#match-table")
+    assert "annuity, interest only to Sep 2031" in page.inner_text("#match-table")
     page.click('[data-deal="Barclays LOBO"]')
     page.wait_for_timeout(200)
     assert page.eval_on_selector("#deal-dlg", "e => e.open")
     page.select_option("#deal-method", "EIP")
-    page.fill("#deal-io", "2030-06-01")
+    page.fill("#deal-io", "2030-06")
     page.click("#deal-save")
     page.wait_for_timeout(300)
     assert "equal instalments" not in page.inner_text("#match-table").lower() or True
-    assert "eip, interest only to 2030-06-01" in page.inner_text("#match-table")
+    assert "eip, interest only to Jun 2030" in page.inner_text("#match-table")
     assert json.loads(page.evaluate("localStorage.getItem('pwlb.bench.deals')"))["Barclays LOBO"]["method"] == "EIP"
     # a confirmed match is remembered
     assert json.loads(page.evaluate("localStorage.getItem('pwlb.bench.matches')"))["DMADF"] == "class:dmadf"

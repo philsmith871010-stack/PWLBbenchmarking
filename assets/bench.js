@@ -135,6 +135,9 @@
     for(var p=1;p<paid;p++){rem-=pmt-rem*r}
     return Math.max(0,rem);
   }
+  // "interest only until Sep 2031" means the first instalment falls after that month
+  function monthEnd(ym){var m=String(ym||'').match(/^(\d{4})-(\d{2})/);return m?new Date(+m[1],+m[2],0):parseDate(ym)}
+  function monthLabel(ym){var d=monthEnd(ym);return d?['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]+' '+d.getFullYear():''}
   function loanObj(l){return {method:l[0],start:parseDate(l[1]),maturity:parseDate(l[2]),principal:l[3],rate:l[4]}}
 
   // ---- rates, live with a fixture behind them
@@ -183,7 +186,7 @@
   function borrowing(){
     var feed=(S.auth&&D.loans.loans[S.auth.code])||[];
     var loans=feed.map(loanObj).map(function(l){l.src='PWLB';return l});
-    var pasted=S.rows.filter(function(r){return r.side==='borrowing'&&r.start&&r.end}).map(function(r){var d=S.deals[r.name]||{};return {name:r.name,method:d.method||(/ANNUITY/.test(r.profile)?'ANNUITY':/EIP|EQUAL/.test(r.profile)?'EIP':'MATURITY'),io:d.io?parseDate(d.io):null,freq:d.freq?+d.freq:6,start:r.start,maturity:r.end,principal:r.amount,rate:r.rate||0,src:/pwlb/i.test(r.type)?'PWLB':'Market'}});
+    var pasted=S.rows.filter(function(r){return r.side==='borrowing'&&r.start&&r.end}).map(function(r){var d=S.deals[r.name]||{};return {name:r.name,method:d.method||(/ANNUITY/.test(r.profile)?'ANNUITY':/EIP|EQUAL/.test(r.profile)?'EIP':'MATURITY'),io:d.io?monthEnd(d.io):null,freq:d.freq?+d.freq:6,start:r.start,maturity:r.end,principal:r.amount,rate:r.rate||0,src:/pwlb/i.test(r.type)?'PWLB':'Market'}});
     if(loans.length)pasted=pasted.filter(function(l){return l.src!=='PWLB'});
     var all=loans.concat(pasted).map(function(l){l.out=outstanding(l,TODAY);return l}).filter(function(l){return l.out>0});
     var tot=all.reduce(function(a,l){return a+l.out},0);
@@ -210,7 +213,9 @@
   function ladderOf(loans){var out={},tot=loans.reduce(function(s,l){return s+owed(l,TODAY)},0);BUCKETS.forEach(function(b){var v=b[3]==null?loans.reduce(function(s,l){return s+owed(l,addYears(TODAY,b[2]))},0):repaid(loans,addYears(TODAY,b[2]),addYears(TODAY,b[3]));out[b[0]]=tot?v/tot*100:0});return out}
   function peerLadder(){var per={};BUCKETS.forEach(function(b){per[b[0]]=[]});peerSet().forEach(function(a){var ls=(D.loans.loans[a.code]||[]).map(loanObj).filter(function(l){return owed(l,TODAY)>0});if(!ls.length)return;var L=ladderOf(ls);BUCKETS.forEach(function(b){per[b[0]].push(L[b[0]])})});var out={};BUCKETS.forEach(function(b){out[b[0]]=stats(per[b[0]])});return out}
   // financial years, April to March, the current one from today
-  function fyRows(loans,n){var y0=TODAY.getMonth()>=3?TODAY.getFullYear():TODAY.getFullYear()-1,out=[];for(var i=0;i<n;i++){var a=i===0?TODAY:new Date(y0+i,3,1),b=new Date(y0+i+1,3,1);out.push({fy:String(y0+i).slice(2)+'/'+String(y0+i+1).slice(2),pwlb:repaid(loans.filter(function(l){return l.src==='PWLB'}),a,b)/1e6,other:repaid(loans.filter(function(l){return l.src!=='PWLB'}),a,b)/1e6})}return out}
+  function fyRows(loans,n){var y0=TODAY.getMonth()>=3?TODAY.getFullYear():TODAY.getFullYear()-1,out=[];for(var i=0;i<n;i++){var a=i===0?TODAY:new Date(y0+i,3,1),b=new Date(y0+i+1,3,1);
+    var tot=0,wr=0;loans.forEach(function(l){var v=Math.max(0,owed(l,a)-owed(l,b));tot+=v;wr+=v*l.rate});
+    out.push({fy:String(y0+i).slice(2)+'/'+String(y0+i+1).slice(2),pwlb:repaid(loans.filter(function(l){return l.src==='PWLB'}),a,b)/1e6,other:repaid(loans.filter(function(l){return l.src!=='PWLB'}),a,b)/1e6,rate:tot?wr/tot:null})}return out}
   // ---- what was raised and placed in the last twelve months
   function activity(){
     var cut=new Date(TODAY);cut.setFullYear(cut.getFullYear()-1);
@@ -317,7 +322,7 @@
         bars([bar('PWLB share of long-term',S.auth&&S.auth.bor&&S.auth.bor.total-S.auth.bor.short>0?S.auth.bor.pwlb/(S.auth.bor.total-S.auth.bor.short)*100:null,PB.pwlbShare,'%',0),bar('PWLB rate',B.rate,PB.rate,'%',2),bar('Weighted life, years',B.life,PB.life,'',1)])+
         (mixT?'<p class="note">By repayment method: '+mixT+'</p>':''))+
       panel('Maturity profile','real','Share of what is owed that falls due in each horizon from today, on the same instalment basis; peers on their PWLB books.','<div class="kpis">'+kpi(pct(B.ladder.y1,0),'within a year')+kpi(pct(B.ladder.y1+B.ladder.y2+B.ladder.y5,0),'within five years')+kpi(pct(B.ladder.y30p,0),'beyond thirty')+'</div>'+bars(BUCKETS.map(function(b){return bar(b[1],B.ladder[b[0]],PL[b[0]],'%',0)})))+
-      panel('Debt maturing by financial year','real','Principal falling due in each year, loan by loan, over the next twenty-five years.',fyChart(B.fy)+'<div class="table-wrap scrollbox" style="max-height:220px;margin-top:8px"><table class="plain"><thead><tr><th>Year</th><th class="num">PWLB</th><th class="num">Other</th><th class="num">Total</th></tr></thead><tbody>'+B.fy.map(function(r){return '<tr><td class="mono">'+r.fy+'</td><td class="num mono">'+fmtM(r.pwlb)+'</td><td class="num mono">'+fmtM(r.other)+'</td><td class="num mono b">'+fmtM(r.pwlb+r.other)+'</td></tr>'}).join('')+'</tbody></table></div>',true)+
+      panel('Debt maturing by financial year','real','Principal falling due in each year, loan by loan, over the next twenty-five years.',fyChart(B.fy)+'<div class="table-wrap scrollbox" style="max-height:220px;margin-top:8px"><table class="plain"><thead><tr><th>Year</th><th class="num">PWLB</th><th class="num">Other</th><th class="num">Total</th><th class="num">Rate on it</th></tr></thead><tbody>'+B.fy.map(function(r){return '<tr><td class="mono">'+r.fy+'</td><td class="num mono">'+fmtM(r.pwlb)+'</td><td class="num mono">'+fmtM(r.other)+'</td><td class="num mono b">'+fmtM(r.pwlb+r.other)+'</td><td class="num mono">'+(r.rate==null?'\u2014':r.rate.toFixed(2)+'%')+'</td></tr>'}).join('')+'</tbody></table></div>',true)+
       panel('Outstanding balance, projected','real','Every loan run forward on its own repayment profile'+(Object.keys(S.deals).length?', including the bespoke structures you set':'')+'.',projection(B.proj),true)+
       panel('Refinancing in the next twelve months','real','What matures, what it costs today, and what it cost when taken.',
         '<div class="kpis">'+kpi(fmtM(B.refiSum),'maturing',B.refi.length+' loans')+kpi(pct(B.refiWas,2),'rate on those loans')+kpi(pct(B.refiNow,2),'like-for-like today',B.refiNow!=null&&B.refiWas!=null?((B.refiNow-B.refiWas>=0?'+':'\u2212')+Math.abs(B.refiNow-B.refiWas).toFixed(2)+'% if replaced at today\u2019s PWLB rate'):'',B.refiNow>B.refiWas?'dn':'up')+'</div>'+
@@ -372,7 +377,7 @@
         Object.keys(CLASS_LABEL).map(function(k){var id='class:'+k;return c.some(function(o){return o.id===id})?'':'<option value="'+id+'"'+(id===cur?' selected':'')+'>'+CLASS_LABEL[k]+'</option>'}).join('');
       var amt=S.rows.filter(function(r){return r.name===nm}).reduce(function(a,r){return a+r.amount},0)/1e6;
       var side=(S.rows.filter(function(r){return r.name===nm})[0]||{}).side,d=S.deals[nm];
-      var tailor=side==='borrowing'?' <button class="filter tailor" data-deal="'+esc(nm)+'" type="button">Tailor</button>'+(d?'<span class="deal-tag">'+esc(d.method.toLowerCase())+(d.io?', interest only to '+esc(d.io):'')+(d.freq&&d.freq!=='6'?', '+{'12':'annual','3':'quarterly'}[d.freq]:'')+'</span>':''):'';
+      var tailor=side==='borrowing'?' <button class="filter tailor" data-deal="'+esc(nm)+'" type="button">Tailor</button>'+(d?'<span class="deal-tag">'+esc(d.method.toLowerCase())+(d.io?', interest only to '+esc(monthLabel(d.io)):'')+(d.freq&&d.freq!=='6'?', '+{'12':'annual','3':'quarterly'}[d.freq]:'')+'</span>':''):'';
       return '<tr'+(sure?'':' class="bad"')+'><td><b>'+esc(nm)+'</b>'+tailor+'</td><td class="num mono">'+fmtM(amt)+'</td><td class="match-cell"><select data-name="'+esc(nm)+'">'+opts+'</select></td><td>'+(sure?'<span class="chip chip-good">matched</span>':'<span class="chip chip-warn">check</span>')+'</td></tr>';
     }).join('');
     $('match-table').innerHTML='<thead><tr><th>As pasted</th><th class="num">Amount</th><th>Read as</th><th></th></tr></thead><tbody>'+rows+'</tbody>';
@@ -398,7 +403,7 @@
     $('group').addEventListener('change',function(){S.group=$('group').value;if(S.confirmed)render()});
     $('read').addEventListener('click',readPaste);
     $('demo').addEventListener('click',function(){fetch('data/demo.tsv').then(function(r){return r.text()}).then(function(t){$('paste').value=t;if(!S.auth){var a=D.peers.authorities.filter(function(x){return x.name==='Camden'})[0];if(a)pickAuth(a)}readPaste();
-      if(!S.deals['Phoenix Life']){S.deals['Phoenix Life']={method:'ANNUITY',io:'2031-09-30',freq:'6'};renderMatch()}})});
+      if(!S.deals['Phoenix Life']){S.deals['Phoenix Life']={method:'ANNUITY',io:'2031-09',freq:'6'};renderMatch()}})});
     $('match-table').addEventListener('change',function(e){var s=e.target.closest('select[data-name]');if(s)S.matches[s.dataset.name]=s.value});
     $('confirm').addEventListener('click',confirm);
     $('tabs').addEventListener('click',function(e){var b=e.target.closest('.tab');if(b&&!b.disabled)showTab(b.dataset.tab)});
