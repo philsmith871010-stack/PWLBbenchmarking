@@ -165,8 +165,8 @@
     var ret=rw?rated.reduce(function(a,r){return a+r.amount*r.rate},0)/rw:null;
     var dur=inv.map(function(r){return {a:r.amount,d:tenorDays(r),k:classify(r)}}).filter(function(x){return x.d!=null&&x.k!=='funds'});
     var dw=dur.reduce(function(a,x){return a+x.a},0),wd=dw?dur.reduce(function(a,x){return a+x.a*x.d},0)/dw:null;
-    var ladder={liquid:0,m3:0,m6:0,y1:0,over:0,funds:0};
-    inv.forEach(function(r){var k=classify(r),d=tenorDays(r),a=r.amount/1e6;if(k==='funds'){ladder.funds+=a;return}if(d==null||d<=7)ladder.liquid+=a;else if(d<=92)ladder.m3+=a;else if(d<=183)ladder.m6+=a;else if(d<=366)ladder.y1+=a;else ladder.over+=a});
+    var ladder={liquid:0,m1:0,m3:0,m6:0,y1:0,over:0,funds:0};
+    inv.forEach(function(r){var k=classify(r),d=tenorDays(r),a=r.amount/1e6;if(k==='funds'){ladder.funds+=a;return}if(d==null||d<=2)ladder.liquid+=a;else if(d<=31)ladder.m1+=a;else if(d<=92)ladder.m3+=a;else if(d<=183)ladder.m6+=a;else if(d<=366)ladder.y1+=a;else ladder.over+=a});
     // one exposure per counterparty: a bank by its master-list entry, whatever it was called in the
     // paste; a fund or an authority by its own name, since two money market funds are two names
     var byName={},matchOf={};inv.forEach(function(r){var m=S.matches[r.name]||'',k=m&&m.indexOf('class:')<0?m:r.name;byName[k]=(byName[k]||0)+r.amount/1e6;matchOf[k]=m});
@@ -198,11 +198,19 @@
     var refi=all.filter(function(l){return l.maturity<=horizon}).map(function(l){var term=Math.max(1,Math.round(days(l.start,l.maturity)/365.25));return {l:l,term:term,now:rateAt(curve,term)}});
     var refiSum=refi.reduce(function(a,x){return a+x.l.out},0);
     var refiNow=refiSum?refi.reduce(function(a,x){return a+x.l.out*(x.now||0)},0)/refiSum:null,refiWas=refiSum?refi.reduce(function(a,x){return a+x.l.out*x.l.rate},0)/refiSum:null;
-    return {loans:all,total:tot/1e6,pwlb:pwt/1e6,n:pw.length,rate:rate,life:life,mix:mix,proj:proj,refi:refi,refiSum:refiSum/1e6,refiNow:refiNow,refiWas:refiWas,ladder:ladderOf(all)};
+    return {loans:all,total:tot/1e6,pwlb:pwt/1e6,n:pw.length,rate:rate,life:life,mix:mix,proj:proj,refi:refi,refiSum:refiSum/1e6,refiNow:refiNow,refiWas:refiWas,ladder:ladderOf(all),fy:fyRows(all,25)};
   }
-  var BUCKETS=[['y1','Under 1 year',0,1],['y5','1 to 5 years',1,5],['y10','5 to 10 years',5,10],['y20','10 to 20 years',10,20],['y30','20 to 30 years',20,30],['y30p','Over 30 years',30,999]];
-  function ladderOf(loans){var out={},tot=0;BUCKETS.forEach(function(b){out[b[0]]=0});loans.forEach(function(l){var y=days(TODAY,l.maturity)/365.25;var b=BUCKETS.filter(function(x){return y>=x[2]&&y<x[3]})[0]||BUCKETS[5];out[b[0]]+=l.out;tot+=l.out});if(tot)BUCKETS.forEach(function(b){out[b[0]]=out[b[0]]/tot*100});return out}
-  function peerLadder(){var per={};BUCKETS.forEach(function(b){per[b[0]]=[]});peerSet().forEach(function(a){var ls=(D.loans.loans[a.code]||[]).map(loanObj).map(function(l){l.out=outstanding(l,TODAY);return l}).filter(function(l){return l.out>0});if(!ls.length)return;var L=ladderOf(ls);BUCKETS.forEach(function(b){per[b[0]].push(L[b[0]])})});var out={};BUCKETS.forEach(function(b){out[b[0]]=stats(per[b[0]])});return out}
+  // What a loan repays in a period is the fall in what is owed across it, so an EIP or an annuity
+  // puts its instalments in the years they fall due and a maturity loan puts everything at the end.
+  // Before drawdown the whole principal is still owed, so a loan yet to start is not a negative.
+  function owed(l,d){return d<l.start?l.principal:outstanding(l,d)}
+  function repaid(loans,a,b){return loans.reduce(function(s,l){return s+Math.max(0,owed(l,a)-owed(l,b))},0)}
+  function addYears(d,n){var x=new Date(d);x.setFullYear(x.getFullYear()+n);return x}
+  var BUCKETS=[['y1','Under 1 year',0,1],['y2','1 to 2 years',1,2],['y5','2 to 5 years',2,5],['y10','5 to 10 years',5,10],['y20','10 to 20 years',10,20],['y30','20 to 30 years',20,30],['y30p','Over 30 years',30,null]];
+  function ladderOf(loans){var out={},tot=loans.reduce(function(s,l){return s+owed(l,TODAY)},0);BUCKETS.forEach(function(b){var v=b[3]==null?loans.reduce(function(s,l){return s+owed(l,addYears(TODAY,b[2]))},0):repaid(loans,addYears(TODAY,b[2]),addYears(TODAY,b[3]));out[b[0]]=tot?v/tot*100:0});return out}
+  function peerLadder(){var per={};BUCKETS.forEach(function(b){per[b[0]]=[]});peerSet().forEach(function(a){var ls=(D.loans.loans[a.code]||[]).map(loanObj).filter(function(l){return owed(l,TODAY)>0});if(!ls.length)return;var L=ladderOf(ls);BUCKETS.forEach(function(b){per[b[0]].push(L[b[0]])})});var out={};BUCKETS.forEach(function(b){out[b[0]]=stats(per[b[0]])});return out}
+  // financial years, April to March, the current one from today
+  function fyRows(loans,n){var y0=TODAY.getMonth()>=3?TODAY.getFullYear():TODAY.getFullYear()-1,out=[];for(var i=0;i<n;i++){var a=i===0?TODAY:new Date(y0+i,3,1),b=new Date(y0+i+1,3,1);out.push({fy:String(y0+i).slice(2)+'/'+String(y0+i+1).slice(2),pwlb:repaid(loans.filter(function(l){return l.src==='PWLB'}),a,b)/1e6,other:repaid(loans.filter(function(l){return l.src!=='PWLB'}),a,b)/1e6})}return out}
   // ---- what was raised and placed in the last twelve months
   function activity(){
     var cut=new Date(TODAY);cut.setFullYear(cut.getFullYear()-1);
@@ -239,8 +247,8 @@
     var ps=peerSet(),base={London:[4.2,95,0.18,0.42,24,71],'Unitary Authority':[4.1,120,0.2,0.45,22,70],'Shire County':[4.15,140,0.16,0.4,26,72],'Met District':[4.05,110,0.2,0.46,20,69],'Shire District':[4.0,80,0.24,0.52,16,68],'Combined Authority':[4.2,60,0.22,0.5,14,72]}[S.group]||[4.1,100,0.2,0.45,20,70];
     var ret=[],dur=[],lg=[],t3=[],n=[],sc=[],lad=[];
     ps.forEach(function(a){var h=hash(a.code),g=hash(a.code+'x'),k=hash(a.code+'y');ret.push(base[0]+(h-0.5)*0.5);dur.push(base[1]*(0.55+g*0.9));lg.push((base[2]+(k-0.5)*0.14)*100);t3.push((base[3]+(h-0.5)*0.2)*100);n.push(Math.round(base[4]*(0.6+g*0.8)));sc.push(base[5]+(k-0.5)*8);
-      var liq=0.3+h*0.3,m3=0.2+g*0.2,m6=0.1+k*0.15,y1=Math.max(0,1-liq-m3-m6-0.08),ov=0.03,fu=0.05;lad.push({liquid:liq,m3:m3,m6:m6,y1:y1,over:ov,funds:fu})});
-    var L={};['liquid','m3','m6','y1','over','funds'].forEach(function(k){L[k]=stats(lad.map(function(x){return x[k]*100}))});
+      var liq=0.25+h*0.25,m1=0.05+g*0.1,m3=0.15+k*0.15,m6=0.1+h*0.1,y1=Math.max(0,1-liq-m1-m3-m6-0.08),ov=0.03,fu=0.05;lad.push({liquid:liq,m1:m1,m3:m3,m6:m6,y1:y1,over:ov,funds:fu})});
+    var L={};['liquid','m1','m3','m6','y1','over','funds'].forEach(function(k){L[k]=stats(lad.map(function(x){return x[k]*100}))});
     return {ret:stats(ret),days:stats(dur),largest:stats(lg),top3:stats(t3),n:stats(n),score:stats(sc),ladder:L};
   }
 
@@ -268,6 +276,18 @@
     proj.forEach(function(p,i){if(i%2===0||i===n-1)out+='<text class="ax" x="'+X(i).toFixed(1)+'" y="'+(h-8)+'" text-anchor="middle">'+p.y+'</text>'});
     return out+'</svg><div class="legend"><span><i style="background:#0a2540"></i>PWLB</span><span><i style="background:#7d93ad"></i>other borrowing you pasted</span><span class="muted">outstanding at 31 March, loan by loan</span></div>';
   }
+  function fyChart(rows){
+    var w=1300,h=300,L=70,R=16,T=16,B=34,n=rows.length;
+    var max=Math.max.apply(null,rows.map(function(r){return r.pwlb+r.other}))||1;
+    var bw=(w-L-R)/n,Y=function(v){return T+(1-v/max)*(h-T-B)};
+    var out='<svg class="chart" viewBox="0 0 '+w+' '+h+'">';
+    [0,0.5,1].forEach(function(f){var v=max*f;out+='<line x1="'+L+'" x2="'+(w-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="#eef1f4"/><text class="ax" x="'+(L-6)+'" y="'+(Y(v)+4).toFixed(1)+'" text-anchor="end">'+fmtM(v)+'</text>'});
+    rows.forEach(function(r,i){var x=L+i*bw+bw*0.15,ww=bw*0.7;
+      out+='<rect x="'+x.toFixed(1)+'" y="'+Y(r.pwlb).toFixed(1)+'" width="'+ww.toFixed(1)+'" height="'+(Y(0)-Y(r.pwlb)).toFixed(1)+'" fill="#0a2540"><title>'+r.fy+': PWLB '+fmtM(r.pwlb)+(r.other?', other '+fmtM(r.other):'')+'</title></rect>';
+      if(r.other)out+='<rect x="'+x.toFixed(1)+'" y="'+Y(r.pwlb+r.other).toFixed(1)+'" width="'+ww.toFixed(1)+'" height="'+(Y(0)-Y(r.other)).toFixed(1)+'" fill="#7d93ad"><title>'+r.fy+': other '+fmtM(r.other)+'</title></rect>';
+      if(i%2===0)out+='<text class="ax" x="'+(x+ww/2).toFixed(1)+'" y="'+(h-10)+'" text-anchor="middle">'+r.fy+'</text>'});
+    return out+'</svg><div class="legend"><span><i style="background:#0a2540"></i>PWLB</span><span><i style="background:#7d93ad"></i>other borrowing you pasted</span><span class="muted">principal falling due in each financial year, April to March; instalment loans by the instalments they pay</span></div>';
+  }
   function bandMix(bands,total){var keys=['A','B','C','D','E'],out='',x=0;keys.forEach(function(b){var v=bands[b]||0;if(!v)return;var wpc=v/total*100;out+='<span class="band band-'+b+'" style="display:inline-flex;width:'+wpc.toFixed(1)+'%;border-radius:0;height:16px;font-size:10px" title="band '+b+': '+fmtM(v)+'">'+b+'</span>';x+=wpc});return '<div style="display:flex;width:100%;border-radius:5px;overflow:hidden;background:#f1f3f5;margin:6px 0">'+out+'</div>'}
 
   function render(){
@@ -275,7 +295,7 @@
     $('bench-note').textContent=(S.auth?S.auth.name+' against ':'Against ')+ps.length+' '+S.group+(/s$/.test(S.group)?'':' authorities')+' \u00b7 balances at '+D.peers.quarter+' \u00b7 PWLB book '+D.loans.generated.slice(0,10);
     var labels={banks:'Bank deposits',bs:'Building societies',mmf:'Money market funds',dmadf:'DMADF',gov:'Gilts and T-bills',la:'Other authorities',funds:'Pooled funds',other:'Other'};
     var alloc=bars(Object.keys(labels).map(function(k){return bar(labels[k],Y.total?(Y.by[k]||0)/Y.total*100:0,PA[k],'%',0)}));
-    var ladder=bars([['liquid','Call, MMF and up to 7 days'],['m3','8 days to 3 months'],['m6','3 to 6 months'],['y1','6 to 12 months'],['over','Over 12 months'],['funds','Pooled funds']].map(function(x){return bar(x[1],Y.total?Y.ladder[x[0]]/Y.total*100:0,PI.ladder[x[0]],'%',0)}));
+    var ladder=bars([['liquid','Liquid: call, MMF, DMADF'],['m1','Under 1 month'],['m3','1 to 3 months'],['m6','3 to 6 months'],['y1','6 to 12 months'],['over','Over 12 months'],['funds','Pooled funds']].map(function(x){return bar(x[1],Y.total?Y.ladder[x[0]]/Y.total*100:0,PI.ladder[x[0]],'%',0)}));
     var credit=Y.scored.map(function(x){return '<tr><td>'+esc(x.e.short)+(x.e.fixed?' <span class="small muted">'+esc(x.e.kind)+', fixed standing</span>':'')+'</td><td class="num mono">'+fmtM(x.v)+'</td><td class="num"><span class="score" style="color:'+(x.e.score>=75?'#1e7a3a':x.e.score>=65?'#7a5d0a':'#b04632')+'">'+x.e.score.toFixed(0)+'</span> <span class="band band-'+esc(x.e.band)+'">'+esc(x.e.band)+'</span></td><td class="mono">'+esc(x.e.rating_composite||'\u2014')+'</td></tr>'}).join('');
     var mixT=Object.keys(B.mix).map(function(m){return m.charAt(0)+m.slice(1).toLowerCase()+' '+fmtM(B.mix[m]/1e6)}).join(' \u00b7 ');
     var curve=curveOf('MATURITY'),pred=D.pred;
@@ -285,7 +305,7 @@
       panel('Return and duration','ill','Weighted average rate and days to maturity of what you hold; pooled funds excluded from duration.',
         '<div class="kpis">'+kpi(pct(Y.ret,2),'weighted return',vs(Y.ret,PI.ret,'%',2))+kpi(Y.days==null?'\u2014':Math.round(Y.days)+' days','weighted duration',vs(Y.days,PI.days,' days',0))+'</div>'+
         bars([bar('Return',Y.ret,PI.ret,'%',2),bar('Duration, days',Y.days,PI.days,'',0)]))+
-      panel('Maturity ladder','ill','Where the money comes back, as a share of investments.','<div class="kpis">'+kpi(pct(Y.total?Y.ladder.liquid/Y.total*100:null,0),'liquid tomorrow')+kpi(pct(Y.total?(Y.ladder.y1+Y.ladder.over)/Y.total*100:null,0),'beyond six months')+'</div>'+ladder)+
+      panel('Maturity ladder','ill','Where the money comes back, as a share of investments, by the time left to run.','<div class="kpis">'+kpi(pct(Y.total?Y.ladder.liquid/Y.total*100:null,0),'liquid')+kpi(pct(Y.total?(Y.ladder.liquid+Y.ladder.m1)/Y.total*100:null,0),'within a month')+kpi(pct(Y.total?(Y.ladder.y1+Y.ladder.over)/Y.total*100:null,0),'beyond six months')+'</div>'+ladder)+
       panel('Concentration','ill','How much sits with the largest names.','<div class="kpis">'+kpi(pct(Y.largest,0),'largest exposure',vs(Y.largest,PI.largest,'%',0))+kpi(pct(Y.top3,0),'top three',vs(Y.top3,PI.top3,'%',0))+kpi(Y.n,'counterparties',vs(Y.n,PI.n,'',0))+'</div>'+
         bars([bar('Largest',Y.largest,PI.largest,'%',0),bar('Top three',Y.top3,PI.top3,'%',0)]))+
       panel('Credit risk on the Counterparty scale','ill','Weighted score of what you hold, on the published method. The DMADF, gilts, other authorities and money market funds carry a fixed standing; pooled funds carry market risk and are not scored.',
@@ -296,7 +316,8 @@
         '<div class="kpis">'+kpi(fmtM(B.pwlb),'PWLB outstanding',B.n+' loans')+kpi(pct(B.rate,2),'PWLB weighted rate',vs(B.rate,PB.rate,'%',2,true))+kpi(B.life==null?'\u2014':B.life.toFixed(1)+' yrs','weighted life',vs(B.life,PB.life,' yrs',1))+kpi(fmtM(B.total),'all borrowing')+'</div>'+
         bars([bar('PWLB share of long-term',S.auth&&S.auth.bor&&S.auth.bor.total-S.auth.bor.short>0?S.auth.bor.pwlb/(S.auth.bor.total-S.auth.bor.short)*100:null,PB.pwlbShare,'%',0),bar('PWLB rate',B.rate,PB.rate,'%',2),bar('Weighted life, years',B.life,PB.life,'',1)])+
         (mixT?'<p class="note">By repayment method: '+mixT+'</p>':''))+
-      panel('Maturity ladder','real','Share of borrowing by years to maturity; peers on their PWLB books.',bars(BUCKETS.map(function(b){return bar(b[1],B.ladder[b[0]],PL[b[0]],'%',0)})))+
+      panel('Maturity profile','real','Share of what is owed that falls due in each horizon from today, on the same instalment basis; peers on their PWLB books.','<div class="kpis">'+kpi(pct(B.ladder.y1,0),'within a year')+kpi(pct(B.ladder.y1+B.ladder.y2+B.ladder.y5,0),'within five years')+kpi(pct(B.ladder.y30p,0),'beyond thirty')+'</div>'+bars(BUCKETS.map(function(b){return bar(b[1],B.ladder[b[0]],PL[b[0]],'%',0)})))+
+      panel('Debt maturing by financial year','real','Principal falling due in each year, loan by loan, over the next twenty-five years.',fyChart(B.fy)+'<div class="table-wrap scrollbox" style="max-height:220px;margin-top:8px"><table class="plain"><thead><tr><th>Year</th><th class="num">PWLB</th><th class="num">Other</th><th class="num">Total</th></tr></thead><tbody>'+B.fy.map(function(r){return '<tr><td class="mono">'+r.fy+'</td><td class="num mono">'+fmtM(r.pwlb)+'</td><td class="num mono">'+fmtM(r.other)+'</td><td class="num mono b">'+fmtM(r.pwlb+r.other)+'</td></tr>'}).join('')+'</tbody></table></div>',true)+
       panel('Outstanding balance, projected','real','Every loan run forward on its own repayment profile'+(Object.keys(S.deals).length?', including the bespoke structures you set':'')+'.',projection(B.proj),true)+
       panel('Refinancing in the next twelve months','real','What matures, what it costs today, and what it cost when taken.',
         '<div class="kpis">'+kpi(fmtM(B.refiSum),'maturing',B.refi.length+' loans')+kpi(pct(B.refiWas,2),'rate on those loans')+kpi(pct(B.refiNow,2),'like-for-like today',B.refiNow!=null&&B.refiWas!=null?((B.refiNow-B.refiWas>=0?'+':'\u2212')+Math.abs(B.refiNow-B.refiWas).toFixed(2)+'% if replaced at today\u2019s PWLB rate'):'',B.refiNow>B.refiWas?'dn':'up')+'</div>'+

@@ -73,16 +73,19 @@ def test_the_example_reads_matches_and_benchmarks(page):
     assert page.eval_on_selector_all(".tab[disabled]", "e => e.length") == 0
     titles = page.eval_on_selector_all(".panel h3", "e => e.map(x => x.firstChild.textContent)")
     assert titles == ["Investment allocation", "Return and duration", "Maturity ladder", "Concentration",
-                      "Credit risk on the Counterparty scale", "Borrowing", "Maturity ladder", "Outstanding balance, projected",
+                      "Credit risk on the Counterparty scale", "Borrowing", "Maturity profile", "Debt maturing by financial year", "Outstanding balance, projected",
                       "Refinancing in the next twelve months", "New borrowing raised", "New investments placed"]
     tags = page.eval_on_selector_all(".panel .tag", "e => e.map(x => x.textContent)")
-    assert tags.count("published") == 6 and tags.count("illustrative") == 5, "every panel says which it is"
+    assert tags.count("published") == 7 and tags.count("illustrative") == 5, "every panel says which it is"
     inv = page.eval_on_selector("#panels-inv", "e => e.textContent")
     assert "83.5m" in inv and "DMADF (HM Treasury), fixed standing" in inv and "Money market fund, fixed standing" in inv, "the classes carry a fixed high standing"
     bor = page.eval_on_selector("#panels-bor", "e => e.textContent")
     assert "PWLB outstanding" in bor and "5y 5.85%" in bor and "10y 6.20%" in bor, "today's PWLB maturity curve read at the right tenors"
     assert "including the bespoke structures you set" in bor, "the example carries an interest-only annuity"
     assert page.eval_on_selector_all("svg.chart path", "e => e.length") == 2
+    fy = page.eval_on_selector_all("#panels-bor table tbody tr", "e => e.map(r => r.children[0].textContent + ' ' + r.children[3].textContent)")
+    assert fy[0].startswith("26/27") and any(x.startswith("41/42") for x in fy), fy[:3]
+    assert "Liquid: call, MMF, DMADF" in inv and "Under 1 month" in inv and "1 to 3 months" in inv
     page.click('.tab[data-tab="borrowing"]')
     assert page.eval_on_selector("#tab-borrowing", "e => getComputedStyle(e).display") == "block"
     page.click('.tab[data-tab="activity"]')
