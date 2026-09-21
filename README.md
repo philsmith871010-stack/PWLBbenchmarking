@@ -4,7 +4,7 @@ Peer benchmarking for a local authority's treasury portfolio. Paste the range fr
 the names against the Counterparty master list, and see your allocation, return, duration,
 concentration, credit risk and borrowing against your peer group.
 
-Live: https://philsmith871010-stack.github.io/pwlbbenchmarking/
+Live: https://philsmith871010-stack.github.io/PWLBbenchmarking/
 
 ## What is real and what is not
 
