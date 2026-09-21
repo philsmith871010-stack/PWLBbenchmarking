@@ -67,7 +67,7 @@ def test_the_example_reads_matches_and_benchmarks(page):
     assert page.eval_on_selector_all("#match-table tr.bad", "e => e.length") == 2, "only the two lenders need a look"
     page.click("#confirm")
     page.wait_for_timeout(1500)
-    assert "Camden against" in page.inner_text("#bench-note")
+    assert "Camden against" in page.inner_text("#bench-note") and "as at 2026-08-31" in page.inner_text("#bench-note"), "valued at the last month end"
     # the results are three tabs, opened on the investments
     assert page.eval_on_selector(".tab.active", "e => e.dataset.tab") == "investments"
     assert page.eval_on_selector_all(".tab[disabled]", "e => e.length") == 0
@@ -85,6 +85,15 @@ def test_the_example_reads_matches_and_benchmarks(page):
     assert page.eval_on_selector_all("svg.chart path", "e => e.length") == 2
     fy = page.eval_on_selector_all("#panels-bor table tbody tr", "e => e.map(r => r.children[0].textContent + ' ' + r.children[3].textContent)")
     assert fy[0].startswith("26/27") and any(x.startswith("41/42") for x in fy), fy[:3]
+    # the benchmark date moves everything with it
+    page.fill("#asat", "2026-03")
+    page.dispatch_event("#asat", "change")
+    page.wait_for_timeout(600)
+    assert "as at 2026-03-31" in page.inner_text("#bench-note")
+    assert page.eval_on_selector("#panels-bor table tbody tr td", "e => e.textContent") == "25/26"
+    page.fill("#asat", "2026-08")
+    page.dispatch_event("#asat", "change")
+    page.wait_for_timeout(600)
     rate = page.eval_on_selector("#panels-bor table tbody tr td:nth-child(5)", "e => e.textContent")
     assert rate == "4.80%", "the rate on what matures in the current year is the 10m at 4.80%"
     assert "Liquid: call, MMF, DMADF" in inv and "Under 1 month" in inv and "1 to 3 months" in inv

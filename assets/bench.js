@@ -5,7 +5,12 @@
   'use strict';
   var CP_URL='https://philsmith871010-stack.github.io/bankCredit/data/policy.json';
   var RATES_URL='https://pwlbtoday.org/api/data/';
-  var TODAY=new Date(); TODAY.setHours(0,0,0,0);
+  // Everything is valued as at a month end, the last one by default, so a benchmark is a dated
+  // thing that can be repeated and compared: positions, what is owed, what falls due, the window
+  // of activity. The peers' balances are the latest quarterly return in any case.
+  var NOW=new Date(); NOW.setHours(0,0,0,0);
+  var TODAY=new Date(NOW.getFullYear(),NOW.getMonth(),0);
+  function setAsAt(ym){var m=String(ym||'').match(/^(\d{4})-(\d{2})/);if(!m)return;TODAY=new Date(+m[1],+m[2],0);var l=$('asat-label');if(l)l.textContent='as at '+iso(TODAY);if(S.confirmed)render()}
   var D={peers:null,loans:null,cp:null,curves:null,pred:null};
   var S={auth:null,group:'',rows:[],names:[],matches:{},deals:{},confirmed:false};
   function dealsMemory(){try{return JSON.parse(localStorage.getItem('pwlb.bench.deals')||'{}')}catch(e){return{}}}
@@ -297,7 +302,7 @@
 
   function render(){
     var Y=yours(),B=borrowing(),PA=peerAlloc(),PB=peerBorrow(),PI=peerIllustrative(),PL=peerLadder(),A=activity(),ps=peerSet();
-    $('bench-note').textContent=(S.auth?S.auth.name+' against ':'Against ')+ps.length+' '+S.group+(/s$/.test(S.group)?'':' authorities')+' \u00b7 balances at '+D.peers.quarter+' \u00b7 PWLB book '+D.loans.generated.slice(0,10);
+    $('bench-note').textContent=(S.auth?S.auth.name+' against ':'Against ')+ps.length+' '+S.group+(/s$/.test(S.group)?'':' authorities')+' \u00b7 as at '+iso(TODAY)+' \u00b7 peer balances at '+D.peers.quarter+' \u00b7 PWLB book '+D.loans.generated.slice(0,10);
     var labels={banks:'Bank deposits',bs:'Building societies',mmf:'Money market funds',dmadf:'DMADF',gov:'Gilts and T-bills',la:'Other authorities',funds:'Pooled funds',other:'Other'};
     var alloc=bars(Object.keys(labels).map(function(k){return bar(labels[k],Y.total?(Y.by[k]||0)/Y.total*100:0,PA[k],'%',0)}));
     var ladder=bars([['liquid','Liquid: call, MMF, DMADF'],['m1','Under 1 month'],['m3','1 to 3 months'],['m6','3 to 6 months'],['y1','6 to 12 months'],['over','Over 12 months'],['funds','Pooled funds']].map(function(x){return bar(x[1],Y.total?Y.ladder[x[0]]/Y.total*100:0,PI.ladder[x[0]],'%',0)}));
@@ -406,6 +411,7 @@
       if(!S.deals['Phoenix Life']){S.deals['Phoenix Life']={method:'ANNUITY',io:'2031-09',freq:'6'};renderMatch()}})});
     $('match-table').addEventListener('change',function(e){var s=e.target.closest('select[data-name]');if(s)S.matches[s.dataset.name]=s.value});
     $('confirm').addEventListener('click',confirm);
+    var asat=$('asat');if(asat){asat.value=TODAY.getFullYear()+'-'+String(TODAY.getMonth()+1).padStart(2,'0');asat.max=NOW.getFullYear()+'-'+String(NOW.getMonth()+1).padStart(2,'0');asat.addEventListener('change',function(){setAsAt(asat.value)});$('asat-label').textContent='as at '+iso(TODAY)}
     $('tabs').addEventListener('click',function(e){var b=e.target.closest('.tab');if(b&&!b.disabled)showTab(b.dataset.tab)});
     $('match-table').addEventListener('click',function(e){var b=e.target.closest('[data-deal]');if(!b)return;var nm=b.dataset.deal,d=S.deals[nm]||{};$('deal-name').textContent=nm;$('deal-method').value=d.method||'MATURITY';$('deal-io').value=d.io||'';$('deal-freq').value=d.freq||'6';$('deal-dlg').dataset.name=nm;$('deal-dlg').showModal()});
     $('deal-save').addEventListener('click',function(){var nm=$('deal-dlg').dataset.name;S.deals[nm]={method:$('deal-method').value,io:$('deal-io').value||'',freq:$('deal-freq').value};try{localStorage.setItem('pwlb.bench.deals',JSON.stringify(S.deals))}catch(e){}$('deal-dlg').close();renderMatch();if(S.confirmed)render()});
