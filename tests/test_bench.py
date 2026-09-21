@@ -82,6 +82,18 @@ def test_the_example_reads_matches_and_benchmarks(page):
     assert "83.5m" in inv and "DMADF (HM Treasury), fixed standing" in inv and "Money market fund, fixed standing" in inv, "the classes carry a fixed high standing"
     assert "Intra-LA deposit 1" in inv and "Thurrock" not in inv and "Woking" not in inv, "no other authority is named in the results"
     assert page.eval_on_selector_all("#panels-inv svg.chart circle", "e => e.length") == 22, "one bubble per rated investment"
+    assert "83.5m" in page.inner_text("#strip") and "MATURING IN 12 MONTHS" in page.inner_text("#strip")
+    # every mark carries a tooltip that appears beside the pointer
+    page.dispatch_event("#panels-inv svg.chart circle >> nth=0", "mouseover")
+    page.wait_for_timeout(200)
+    tip = page.eval_on_selector(".dtip", "e => e.hidden ? '' : e.textContent")
+    assert "rate" in tip and ("to run" in tip or "same day" in tip), tip
+    page.dispatch_event(".donut path >> nth=0", "mouseover")
+    page.wait_for_timeout(200)
+    assert "you" in page.eval_on_selector(".dtip", "e => e.textContent")
+    page.dispatch_event("#strip", "mouseover")
+    page.wait_for_timeout(200)
+    assert page.eval_on_selector(".dtip", "e => e.hidden"), "and goes when the pointer does"
     bor = page.eval_on_selector("#panels-bor", "e => e.textContent")
     assert "PWLB outstanding" in bor and "5y 5.85%" in bor and "10y 6.20%" in bor, "today's PWLB maturity curve read at the right tenors"
     assert "including the bespoke structures you set" in bor, "the example carries an interest-only annuity"

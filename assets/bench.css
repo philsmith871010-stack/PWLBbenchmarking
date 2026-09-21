@@ -43,18 +43,18 @@ table.plain th.num,table.plain td.num{text-align:right}
 tr.bad td{background:#fff8f6}
 .match-cell select{max-width:360px}
 .side{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
-.panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px}
-.panel{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px 16px;min-width:0}
+.panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:12px}
+.panel{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px 10px;min-width:0}
 .panel.wide{grid-column:1/-1}
 .panel.two{grid-column:span 2}
 @media (max-width:1300px){.panel.two{grid-column:1/-1}}
 .panel h3{margin:0;font-size:14px;color:var(--navy);display:flex;align-items:center;gap:8px}
 .panel h3 .tag{margin-left:auto}
-.panel .sub{margin:2px 0 10px;font-size:12.5px;color:var(--muted)}
+.panel .sub{margin:2px 0 8px;font-size:12px;color:var(--muted);line-height:1.4}
 .tag{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;padding:1px 7px;border-radius:4px;font-weight:600}
 .tag-real{background:#e6f4ea;color:var(--green)}.tag-ill{background:var(--orange-soft);color:var(--amber)}
 .kpis{display:flex;flex-wrap:wrap;gap:6px 22px;margin:4px 0 10px}
-.kpi{display:flex;flex-direction:column;line-height:1.15}.kpi b{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--navy)}.kpi span{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.kpi{display:flex;flex-direction:column;line-height:1.15}.kpi b{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--navy)}.kpi span{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .kpi i{font-style:normal;font-size:12px;color:var(--muted)}.kpi i.up{color:var(--green)}.kpi i.dn{color:var(--red)}
 .bars{display:grid;grid-template-columns:150px minmax(0,1fr) 62px 62px;gap:4px 10px;align-items:center;font-size:12.5px}
 .bars .h{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
@@ -96,3 +96,20 @@ textarea#paste{height:220px;min-height:120px;resize:vertical}
 .deal-grid input,.deal-grid select{font-size:14px}
 .tailor{height:26px;padding:0 9px;font-size:12px}
 .deal-tag{display:inline-block;margin-left:6px;font-size:11px;color:var(--amber)}
+
+/* the tooltip layer */
+.dtip{position:fixed;z-index:50;pointer-events:none;background:#0a2540;color:#fff;border-radius:8px;padding:8px 11px;font-size:12px;line-height:1.45;max-width:300px;box-shadow:0 10px 30px rgba(10,37,64,.28)}
+.dtip b{display:block;font-size:13px;margin-bottom:1px}.dtip>span{display:block;color:#ffd9b3;font-weight:600;margin-bottom:3px}.dtip i{display:block;font-style:normal;color:#c9d3de}.dtip em{font-style:normal;color:#fff;font-weight:600}
+.track[data-tip]{cursor:default}
+/* the headline strip */
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.st{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;line-height:1.15}
+.st b{font-size:24px;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums;letter-spacing:-.01em}.st span{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px}.st i{font-style:normal;font-size:11.5px;color:var(--muted);margin-top:3px;min-height:14px}
+/* the donut and its list */
+.donut-wrap{display:grid;grid-template-columns:170px minmax(0,1fr);gap:8px 14px;align-items:center}
+svg.donut{width:170px;height:170px;display:block}
+.dl{display:flex;flex-direction:column;gap:2px;font-size:12.5px}
+.dl-r,.dl-h{display:grid;grid-template-columns:12px minmax(0,1fr) 44px 44px;gap:8px;align-items:center;padding:2px 0}
+.dl-r i{display:inline-block;width:10px;height:10px;border-radius:3px}.dl-r b{text-align:right;font-variant-numeric:tabular-nums}.dl-r em{font-style:normal;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.dl-h{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--line-soft);margin-top:2px;padding-top:4px}.dl-h b,.dl-h em{text-align:right;font-weight:600;font-style:normal}
+@media (max-width:520px){.donut-wrap{grid-template-columns:1fr}svg.donut{margin:0 auto}}

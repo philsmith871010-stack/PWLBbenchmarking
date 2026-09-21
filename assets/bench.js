@@ -269,11 +269,25 @@
     return {ret:stats(ret),days:stats(dur),largest:stats(lg),top3:stats(t3),n:stats(n),score:stats(sc),ladder:L};
   }
 
+  // ---- tooltips: built with the mark, kept in a registry, shown beside the pointer
+  var TIPS={},TIPN=0,TIPEL=null;
+  function tipd(html){var k='t'+(++TIPN);TIPS[k]=html;return ' data-tip="'+k+'"'}
+  function tipHead(t,s){return '<b>'+t+'</b>'+(s?'<span>'+s+'</span>':'')}
+  function tipEl(){if(TIPEL)return TIPEL;TIPEL=document.createElement('div');TIPEL.className='dtip';TIPEL.hidden=true;document.body.appendChild(TIPEL);return TIPEL}
+  function showTip(el,ev){var html=TIPS[el.getAttribute('data-tip')];if(!html)return;var x=tipEl();x.innerHTML=html;x.hidden=false;
+    var w=x.offsetWidth,h=x.offsetHeight,vw=innerWidth,vh=innerHeight,px=Math.max(10,Math.min(ev.clientX-w/2,vw-w-10)),py=ev.clientY-h-14;if(py<10)py=ev.clientY+18;x.style.left=px+'px';x.style.top=Math.min(py,vh-h-10)+'px'}
+  function hideTip(){if(TIPEL)TIPEL.hidden=true}
+  document.addEventListener('mouseover',function(e){var el=e.target.closest&&e.target.closest('[data-tip]');if(el)showTip(el,e);else if(!e.target.closest('.dtip'))hideTip()});
+  document.addEventListener('mousemove',function(e){var el=e.target.closest&&e.target.closest('[data-tip]');if(el&&TIPEL&&!TIPEL.hidden)showTip(el,e)});
+  addEventListener('scroll',hideTip,true);
+  function peerN(st){return st&&st.n?st.n+' authorities':''}
   // ---- drawing
   function bar(label,you,st,unit,dp){
     var max=Math.max(you||0,st?st.p75:0,1)*1.15;
     var w=function(v){return v==null?0:Math.min(100,v/max*100)};
-    return '<div class="l" title="'+esc(label)+'">'+esc(label)+'</div><div class="track"><span class="you" style="width:'+w(you).toFixed(1)+'%"></span>'+
+    var f=function(v){return v==null?'\u2014':v.toFixed(dp==null?0:dp)+(unit||'')};
+    var tip=tipd(tipHead(esc(label),f(you))+'<i>you <em>'+f(you)+'</em></i>'+(st?'<i>peer mark <em>'+f(st.med)+'</em> \u00b7 middle half '+f(st.p25)+' to '+f(st.p75)+'</i><i>'+peerN(st)+'</i>':'<i>no peer figure</i>'));
+    return '<div class="l">'+esc(label)+'</div><div class="track"'+tip+'><span class="you" style="width:'+w(you).toFixed(1)+'%"></span>'+
       (st?'<span class="rng" style="left:'+w(st.p25).toFixed(1)+'%;width:'+Math.max(0.5,w(st.p75)-w(st.p25)).toFixed(1)+'%"></span><span class="med" style="left:'+w(st.med).toFixed(1)+'%"></span>':'')+
       '</div><div class="num mono">'+(you==null?'—':you.toFixed(dp==null?0:dp)+(unit||''))+'</div><div class="num mono muted">'+(st?st.med.toFixed(dp==null?0:dp)+(unit||''):'—')+'</div>';
   }
@@ -291,6 +305,9 @@
     [0,0.5,1].forEach(function(f){var v=max*f;out+='<line x1="'+L+'" x2="'+(w-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="#eef1f4"/><text class="ax" x="'+(L-6)+'" y="'+(Y(v)+3).toFixed(1)+'" text-anchor="end">'+fmtM(v)+'</text>'});
     out+='<path d="'+area('pwlb',zero)+'" fill="#0a2540" fill-opacity=".85"/><path d="'+area('other',pw)+'" fill="#7d93ad" fill-opacity=".6"/>';
     proj.forEach(function(p,i){if(i%2===0||i===n-1)out+='<text class="ax" x="'+X(i).toFixed(1)+'" y="'+(h-8)+'" text-anchor="middle">'+p.y+'</text>'});
+    var cw=(w-L-R)/Math.max(1,n-1);
+    proj.forEach(function(p,i){var tip=tipd(tipHead('31 March '+p.y,fmtM(p.pwlb+p.other))+'<i>PWLB <em>'+fmtM(p.pwlb)+'</em>'+(p.other?' \u00b7 other <em>'+fmtM(p.other)+'</em>':'')+'</i>'+(i?'<i>'+((p.pwlb+p.other)-(proj[i-1].pwlb+proj[i-1].other)>=0?'+':'\u2212')+fmtM(Math.abs((p.pwlb+p.other)-(proj[i-1].pwlb+proj[i-1].other)))+' on the year before</i>':''));
+      out+='<rect x="'+(X(i)-cw/2).toFixed(1)+'" y="'+T+'" width="'+cw.toFixed(1)+'" height="'+(h-T-B)+'" fill="transparent"'+tip+'/>'});
     return out+'</svg><div class="legend"><span><i style="background:#0a2540"></i>PWLB</span><span><i style="background:#7d93ad"></i>other borrowing you pasted</span><span class="muted">outstanding at 31 March, loan by loan</span></div>';
   }
   function fyChart(rows){
@@ -300,8 +317,10 @@
     var out='<svg class="chart" viewBox="0 0 '+w+' '+h+'">';
     [0,0.5,1].forEach(function(f){var v=max*f;out+='<line x1="'+L+'" x2="'+(w-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="#eef1f4"/><text class="ax" x="'+(L-6)+'" y="'+(Y(v)+4).toFixed(1)+'" text-anchor="end">'+fmtM(v)+'</text>'});
     rows.forEach(function(r,i){var x=L+i*bw+bw*0.15,ww=bw*0.7;
-      out+='<rect x="'+x.toFixed(1)+'" y="'+Y(r.pwlb).toFixed(1)+'" width="'+ww.toFixed(1)+'" height="'+(Y(0)-Y(r.pwlb)).toFixed(1)+'" fill="#0a2540"><title>'+r.fy+': PWLB '+fmtM(r.pwlb)+(r.other?', other '+fmtM(r.other):'')+'</title></rect>';
-      if(r.other)out+='<rect x="'+x.toFixed(1)+'" y="'+Y(r.pwlb+r.other).toFixed(1)+'" width="'+ww.toFixed(1)+'" height="'+(Y(0)-Y(r.other)).toFixed(1)+'" fill="#7d93ad"><title>'+r.fy+': other '+fmtM(r.other)+'</title></rect>';
+      var tip=tipd(tipHead('20'+r.fy,fmtM(r.pwlb+r.other))+'<i>PWLB <em>'+fmtM(r.pwlb)+'</em>'+(r.other?' \u00b7 other <em>'+fmtM(r.other)+'</em>':'')+'</i>'+(r.rate!=null?'<i>rate on it <em>'+r.rate.toFixed(2)+'%</em></i>':''));
+      out+='<rect x="'+x.toFixed(1)+'" y="'+Y(r.pwlb+r.other).toFixed(1)+'" width="'+ww.toFixed(1)+'" height="'+Math.max(2,Y(0)-Y(r.pwlb+r.other)).toFixed(1)+'" fill="transparent"'+tip+'/>';
+      out+='<rect x="'+x.toFixed(1)+'" y="'+Y(r.pwlb).toFixed(1)+'" width="'+ww.toFixed(1)+'" height="'+(Y(0)-Y(r.pwlb)).toFixed(1)+'" fill="#0a2540" pointer-events="none"/>';
+      if(r.other)out+='<rect x="'+x.toFixed(1)+'" y="'+Y(r.pwlb+r.other).toFixed(1)+'" width="'+ww.toFixed(1)+'" height="'+(Y(0)-Y(r.other)).toFixed(1)+'" fill="#7d93ad" pointer-events="none"/>';
       if(i%2===0)out+='<text class="ax" x="'+(x+ww/2).toFixed(1)+'" y="'+(h-10)+'" text-anchor="middle">'+r.fy+'</text>'});
     return out+'</svg><div class="legend"><span><i style="background:#0a2540"></i>PWLB</span><span><i style="background:#7d93ad"></i>other borrowing you pasted</span><span class="muted">principal falling due in each financial year, April to March; instalment loans by the instalments they pay</span></div>';
   }
@@ -318,10 +337,24 @@
     [1,7,31,92,183,365].filter(function(d){return d<=maxD}).forEach(function(d){out+='<line x1="'+X(d).toFixed(1)+'" x2="'+X(d).toFixed(1)+'" y1="'+T+'" y2="'+(h-B)+'" stroke="#eef1f4"/><text class="ax" x="'+X(d).toFixed(1)+'" y="'+(h-16)+'" text-anchor="middle">'+(d===1?'call':d===7?'1w':d===31?'1m':d===92?'3m':d===183?'6m':'1y')+'</text>'});
     var step=(hi-lo)>1?0.5:0.25;for(var v=Math.ceil(lo/step)*step;v<=hi;v+=step)out+='<line x1="'+L+'" x2="'+(w-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="#eef1f4"/><text class="ax" x="'+(L-8)+'" y="'+(Y(v)+4).toFixed(1)+'" text-anchor="end">'+v.toFixed(2)+'%</text>';
     pts.sort(function(a,b){return b.r.amount-a.r.amount}).forEach(function(p){var rr=6+Math.sqrt(p.r.amount/maxA)*26;
-      out+='<circle cx="'+X(p.d).toFixed(1)+'" cy="'+Y(p.rate).toFixed(1)+'" r="'+rr.toFixed(1)+'" fill="'+col(p.sc)+'" fill-opacity=".55" stroke="'+col(p.sc)+'" stroke-width="1.5"><title>'+esc(p.label)+': '+fmtM(p.r.amount/1e6)+' at '+p.rate.toFixed(2)+'%, '+(p.d<=1?'call':p.d+' days')+(p.sc!=null?', standing '+p.sc.toFixed(0):', not scored')+'</title></circle>'});
+      var tip=tipd(tipHead(esc(p.label),fmtM(p.r.amount/1e6))+'<i>rate <em>'+p.rate.toFixed(2)+'%</em> \u00b7 '+(p.d<=1?'call or same day':p.d+' days to run')+'</i>'+'<i>'+(p.sc!=null?'standing <em>'+p.sc.toFixed(0)+'</em>'+(p.r.end?' \u00b7 matures '+iso(p.r.end):''):'not scored')+'</i>'+(p.r.type?'<i>'+esc(p.r.type)+'</i>':''));
+      out+='<circle cx="'+X(p.d).toFixed(1)+'" cy="'+Y(p.rate).toFixed(1)+'" r="'+rr.toFixed(1)+'" fill="'+col(p.sc)+'" fill-opacity=".55" stroke="'+col(p.sc)+'" stroke-width="1.5"'+tip+'/>'});
     return out+'</svg><div class="legend"><span>size: amount</span><span>across: time to run, log scale</span><span>up: rate</span><span><i style="background:#1e7a3a"></i>85 and over</span><span><i style="background:#4f7a1f"></i>75 to 84</span><span><i style="background:#b35900"></i>65 to 74</span><span><i style="background:#b04632"></i>under 65</span><span><i style="background:#b8c2ce"></i>not scored</span></div>';
   }
-  function bandMix(bands,total){var keys=['A','B','C','D','E'],out='',x=0;keys.forEach(function(b){var v=bands[b]||0;if(!v)return;var wpc=v/total*100;out+='<span class="band band-'+b+'" style="display:inline-flex;width:'+wpc.toFixed(1)+'%;border-radius:0;height:16px;font-size:10px" title="band '+b+': '+fmtM(v)+'">'+b+'</span>';x+=wpc});return '<div style="display:flex;width:100%;border-radius:5px;overflow:hidden;background:#f1f3f5;margin:6px 0">'+out+'</div>'}
+  var CLASS_COL={banks:'#0a2540',bs:'#3f5f85',mmf:'#2a78d6',dmadf:'#1baf7a',gov:'#008300',la:'#eda100',funds:'#eb6834',other:'#c3cbd5'};
+  function donut(by,total,PA,labels){
+    var keys=Object.keys(labels),r=64,R=78,cx=100,cy=100,out='<svg viewBox="0 0 200 200" class="donut">';
+    var ring=function(shares,ri,ro,who){var a0=-Math.PI/2,s='';keys.forEach(function(k){var v=shares[k]||0;if(v<=0)return;var a1=a0+v/100*2*Math.PI,big=(a1-a0)>Math.PI?1:0;
+      var p=function(rr,a){return (cx+rr*Math.cos(a)).toFixed(2)+' '+(cy+rr*Math.sin(a)).toFixed(2)};
+      s+='<path d="M'+p(ro,a0)+'A'+ro+' '+ro+' 0 '+big+' 1 '+p(ro,a1)+'L'+p(ri,a1)+'A'+ri+' '+ri+' 0 '+big+' 0 '+p(ri,a0)+'Z" fill="'+CLASS_COL[k]+'"'+(who==='peers'?' fill-opacity=".45"':'')+tipd(tipHead(esc(labels[k]),v.toFixed(0)+'%')+'<i>'+who+'</i>')+'/>';a0=a1});return s};
+    var mine={};keys.forEach(function(k){mine[k]=total?(by[k]||0)/total*100:0});
+    var peers={};keys.forEach(function(k){peers[k]=PA[k]?PA[k].med:0});
+    out+=ring(mine,r-24,r,'you')+ring(peers,R-8,R,'peer group, pooled');
+    out+='<text x="100" y="96" text-anchor="middle" font-size="20" font-weight="700" fill="#0a2540">'+fmtM(total)+'</text><text x="100" y="112" text-anchor="middle" font-size="9" fill="#6c757d" letter-spacing=".06em">INVESTED</text></svg>';
+    var list='<div class="dl">'+keys.map(function(k){return '<div class="dl-r"'+tipd(tipHead(esc(labels[k]),mine[k].toFixed(0)+'%')+'<i>you <em>'+mine[k].toFixed(0)+'%</em> \u00b7 peers pooled <em>'+peers[k].toFixed(0)+'%</em></i>'+(PA[k]?'<i>middle half '+PA[k].p25.toFixed(0)+' to '+PA[k].p75.toFixed(0)+'% \u00b7 '+peerN(PA[k])+'</i>':''))+'><i style="background:'+CLASS_COL[k]+'"></i><span>'+esc(labels[k])+'</span><b>'+mine[k].toFixed(0)+'%</b><em>'+peers[k].toFixed(0)+'%</em></div>'}).join('')+'<div class="dl-h"><span></span><b>you</b><em>peers</em></div></div>';
+    return '<div class="donut-wrap">'+out+list+'</div>';
+  }
+  function bandMix(bands,total){var keys=['A','B','C','D','E'],out='',x=0;keys.forEach(function(b){var v=bands[b]||0;if(!v)return;var wpc=v/total*100;out+='<span class="band band-'+b+'" style="display:inline-flex;width:'+wpc.toFixed(1)+'%;border-radius:0;height:16px;font-size:10px"'+tipd(tipHead('Band '+b,fmtM(v))+'<i>'+wpc.toFixed(0)+'% of the scored money</i>')+'>'+b+'</span>';x+=wpc});return '<div style="display:flex;width:100%;border-radius:5px;overflow:hidden;background:#f1f3f5;margin:6px 0">'+out+'</div>'}
 
   function render(){
     var Y=yours(),B=borrowing(),PA=peerAlloc(),PB=peerBorrow(),PI=peerIllustrative(),PL=peerLadder(),A=activity(),ps=peerSet();
@@ -332,10 +365,18 @@
     var credit=Y.scored.map(function(x){return '<tr><td>'+esc(x.e.short)+(x.e.fixed?' <span class="small muted">'+esc(x.e.kind)+', fixed standing</span>':'')+'</td><td class="num mono">'+fmtM(x.v)+'</td><td class="num"><span class="score" style="color:'+(x.e.score>=75?'#1e7a3a':x.e.score>=65?'#7a5d0a':'#b04632')+'">'+x.e.score.toFixed(0)+'</span> <span class="band band-'+esc(x.e.band)+'">'+esc(x.e.band)+'</span></td><td class="mono">'+esc(x.e.rating_composite||'\u2014')+'</td></tr>'}).join('');
     var mixT=Object.keys(B.mix).map(function(m){return m.charAt(0)+m.slice(1).toLowerCase()+' '+fmtM(B.mix[m]/1e6)}).join(' \u00b7 ');
     var curve=curveOf('MATURITY'),pred=D.pred;
+    $('strip').innerHTML=[
+      [fmtM(Y.total),'invested',PA.total?'peers '+fmtM(PA.total.med):''],
+      [pct(Y.ret,2),'weighted return',vs(Y.ret,PI.ret,'%',2)],
+      [Y.wscore==null?'\u2014':Y.wscore.toFixed(1),'weighted score',vs(Y.wscore,PI.score,'',1)],
+      [fmtM(B.total),'borrowing',B.n+' PWLB loans'],
+      [pct(B.rate,2),'PWLB rate',vs(B.rate,PB.rate,'%',2,true)],
+      [fmtM(B.refiSum),'maturing in 12 months',B.refiNow!=null?'today '+pct(B.refiNow,2):'']
+    ].map(function(x){return '<div class="st"><b>'+x[0]+'</b><span>'+x[1]+'</span><i>'+x[2]+'</i></div>'}).join('');
     $('panels-inv').innerHTML=
       panel('Your investments: size, rate, time and standing','real','Every investment you pasted, one bubble each. Point at one for its figures. Other authorities appear as intra-LA deposits, never by name.',bubbles(Y.inv),true)+
       panel('Investment allocation','real','Share of investments by counterparty class. The mark is the peer group\u2019s pooled share from the quarterly returns ('+PA.n+' filed), the band the middle half of authorities.',
-        '<div class="kpis">'+kpi(fmtM(Y.total),'invested',PA.total?'peer median '+fmtM(PA.total.med):'')+kpi(Y.n,'counterparties')+'</div>'+alloc)+
+        donut(Y.by,Y.total,PA,labels)+'<p class="note">Inner ring you, outer ring the peer group pooled. Point at a segment or a row.</p>')+
       panel('Return and duration','ill','Weighted average rate and days to maturity of what you hold; pooled funds excluded from duration.',
         '<div class="kpis">'+kpi(pct(Y.ret,2),'weighted return',vs(Y.ret,PI.ret,'%',2))+kpi(Y.days==null?'\u2014':Math.round(Y.days)+' days','weighted duration',vs(Y.days,PI.days,' days',0))+'</div>'+
         bars([bar('Return',Y.ret,PI.ret,'%',2),bar('Duration, days',Y.days,PI.days,'',0)]))+
